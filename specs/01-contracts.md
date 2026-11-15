@@ -121,7 +121,7 @@ the LAN demo uses.
 | `OLLAMA_URL` | `OLLAMA_URL` | `http://127.0.0.1:11434` | Local inference server. |
 | `OLLAMA_MODEL` | `OLLAMA_MODEL` | `llama3.2:3b` | Model name; any pulled model works. |
 | `SESSION_COOKIE` | — | `atm_sid` | Session cookie name. |
-| `SESSION_IDLE_MS` | — | `86400000` | Sessions with no request for 24 h are swept (slice 04). |
+| `SESSION_GRACE_MS` | — | `60000` | A session with no connected socket is kept this long, then its name is free again. |
 
 ## 4. Money
 
@@ -179,6 +179,7 @@ Non-2xx responses are always:
 | 400 | `AMOUNT_TOO_LARGE` | Deposit greater than `MAX_DEPOSIT_CENTS` |
 | 401 | `NOT_AUTHENTICATED` | No valid session cookie |
 | 400 | `INVALID_QUESTION` | Assistant message empty or longer than 500 characters |
+| 409 | `NAME_TAKEN` | Another logged-in session already uses that name |
 | 409 | `LOCK_NOT_HELD` | Deposit/withdraw without holding the lock |
 | 409 | `LOCK_LOST` | Lock renewal by a session that no longer owns it |
 | 423 | `ACCOUNT_LOCKED` | Lock requested while another session owns it |
@@ -226,12 +227,14 @@ log API and the AI all show identical wording:
 
 ### 6.3 Endpoints
 
-All except `GET /api/health` and `POST /api/session` require a session.
+All except `GET /api/health`, `POST /api/session` and
+`GET /api/session/availability` require a session.
 
 | Method | Path | Request | Success |
 |--------|------|---------|---------|
 | GET | `/api/health` | — | `200 { "ok": true }` |
-| POST | `/api/session` | `{ "name": "USER1" }` | `201 { "session": { "userName": "USER1" } }` + `Set-Cookie` |
+| POST | `/api/session` | `{ "name": "USER1" }` | `201 { "session": { "userName": "USER1" } }` + `Set-Cookie`; `200` when this browser already holds that name; `409 NAME_TAKEN` when another session does |
+| GET | `/api/session/availability` | `?name=USER1` | `200 { "available": boolean }` |
 | GET | `/api/session` | — | `200 { "session": { "userName": "USER1" } }` |
 | DELETE | `/api/session` | — | `204`, cookie cleared, `logout` entry |
 | GET | `/api/account` | — | `200 { "account": Account }` |
@@ -254,12 +257,23 @@ Notes that hold for every endpoint:
   `evidence`, oldest first: exactly the rows given to the model.
 - Amounts arrive as `amountCents`; the server rejects anything that is not a
   positive integer.
+- **Names are unique among live sessions.** `POST /api/session` refuses a name held
+  by another session with `409 NAME_TAKEN`. A name becomes free again when its
+  session ends: sign-out, or `SESSION_GRACE_MS` after that session's last socket
+  disconnects. The availability endpoint is the login screen's early warning; the
+  `POST` check is the authority, and it is a synchronous check-then-create so two
+  simultaneous logins cannot both win.
 
 ## 7. WebSocket contract
 
 Socket.IO on the same HTTP server, so the browser connects to the page's own
 origin. The session cookie is sent with the handshake; the server resolves it to
 a session (or none) and keeps `socket.data.sessionId` / `socket.data.userName`.
+
+The server also counts sockets per session with `setSessionSockets`. That count is
+what makes a name unique: when the last socket of a session disconnects, the
+session starts its `SESSION_GRACE_MS` countdown, and after that its name can be
+used again. A browser that is still making requests never loses its name.
 
 The server broadcasts to **all** connected sockets. A socket that is not logged in
 ignores the events; it is still sent them so that a freshly loaded page already
@@ -339,12 +353,20 @@ export function recordEvent(db: Database.Database, input: RecordEventInput): Act
 export function listEntries(db: Database.Database, filter?: EntryFilter): ActivityEntry[];
 export function toPublicEntry(row: ActivityRow): ActivityEntry; // builds `message`
 
-// sessions.ts
-export function createSession(userName: string): Session;
-export function getSession(id: string | null): Session | null;
+// sessions.ts   (slices 04 and 05)
+export interface Session {
+  id: string; userName: string; createdAtMs: number; lastSeenMs: number;
+  sockets: number;               // connected sockets, maintained by realtime.ts
+  absentSinceMs: number | null;  // set when the last socket disconnects
+}
+export function createSession(userName: string, nowMs?: number): Session;
+export function getSession(id: string | null, nowMs?: number): Session | null;
+export function findSessionByName(userName: string, nowMs?: number): Session | null;
+export function isNameTaken(userName: string, nowMs?: number): boolean;
+export function setSessionSockets(id: string, count: number, nowMs?: number): void;
 export function destroySession(id: string): void;
 export function readSessionId(cookieHeader: string | undefined): string | null;
-export function sweepIdleSessions(nowMs: number): Session[];
+export function sweepSessions(nowMs: number): Session[]; // returns the destroyed ones
 
 // lock.ts  (slice 07)
 export function acquire(sessionId: string, userName: string, nowMs?: number): LockInfo;
@@ -373,9 +395,11 @@ re-reading the log.
 `expiresAtMs`); `LockState` is what `GET /api/lock` and the sockets send.
 
 Lock state is the only thing the server sends differently per socket: each socket
-receives `{ lock: getLockState(socket.data.sessionId) }`, because names are not
-unique and two sessions may share one. Every other event is identical for
-everyone. Slice 05 owns the implementation.
+receives `{ lock: getLockState(socket.data.sessionId) }`. Names are unique among
+live sessions, so `ownerName` would almost do, but `isMine` comes from the session
+id — the same key the lock is actually held by — so a later change to the naming
+rule cannot silently mislead a client. Every other event is identical for everyone.
+Slice 05 owns the implementation.
 
 ## 10. Conventions
 

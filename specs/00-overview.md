@@ -67,12 +67,16 @@ Copied from the source spec and from `AGENTS.md`. They apply to every slice.
   the problem.
 - **One shared account.** There is no per-user balance anywhere in the system.
 - **Uppercase A–Z only** for names; names are at least 3 characters.
+- **Login names are unique while in use.** A second person who picks the same name
+  is stopped on the login page, and the server is what stops them. A name is free
+  again when its session ends.
 
 ## 4. Terms
 
 | Term | Meaning |
 |------|---------|
 | **Session** | One logged-in browser. Identified by an httpOnly cookie `atm_sid`. |
+| **Name** | The uppercase A–Z label a person logs in with. Unique among live sessions. |
 | **Client** | A browser tab running the ATM. |
 | **Lock** | The single transaction lock. Owned by at most one session at a time. |
 | **Lease** | The expiry time of the lock; the owner renews it while on an amount screen. |

@@ -41,6 +41,10 @@ export function getIo(): SocketIOServer | null; // for tests and slice 07
 - On connection, resolve the session from the handshake cookie:
   `readSessionId(socket.handshake.headers.cookie)` → `getSession(id)`, and store
   `socket.data.sessionId` and `socket.data.userName` (both `null` when absent).
+- Keep `Map<sessionId, Set<socketId>>` in this module and call
+  `setSessionSockets(sessionId, set.size)` on every connection and disconnection.
+  That count is what ends a session — and frees its name — `SESSION_GRACE_MS` after
+  the last socket goes. Slice 07 uses the same map to release a lock.
 - Immediately after `connection`, send that socket the current `account:updated`
   and `lock:updated` payloads, so the first paint does not need a round trip.
   Slice 07 owns the lock payload; until then emit
@@ -60,8 +64,10 @@ Until slice 07, `getLockState` is a local stub that always returns
 `{ locked: false, ownerName: null, isMine: false, expiresAtMs: null }`; slice 07
 replaces it with the real one from `lock.ts`, and this loop does not change.
 
-This is the only per-socket send in the system. Names are not unique, so the
-client cannot work out `isMine` from `ownerName` alone; the server decides.
+This is the only per-socket send in the system. The lock is held by a *session*, so
+`isMine` is computed from the receiver's session id rather than by having each
+client compare `ownerName`. Names are unique among live sessions, but they are still
+a label; the session id is the identity.
 
 - No `socket.on(...)` handlers except the `disconnect` hook added by slice 07.
   Clients do not send commands over the socket.
@@ -79,6 +85,7 @@ export function connectRealtime(handlers: {
   onActivity: (entry: ActivityEntry) => void;
   onStatus: (status: "connected" | "connecting" | "offline") => void;
 }): void;
+export function refreshSession(): void; // drop and re-open the socket
 ```
 
 - Uses the global `io` from `/socket.io/socket.io.js` (type-only import from
@@ -91,6 +98,11 @@ export function connectRealtime(handlers: {
 - `disconnect` → `onStatus("connecting")` while Socket.IO keeps trying;
   `reconnect_failed` and `connect_error` after the first attempt →
   `onStatus("offline")`.
+- `refreshSession` is `socket.disconnect(); socket.connect();`. The socket reads the
+  session cookie **only during the handshake**, so `main.ts` calls it right after a
+  successful login and after sign-out. Without it, a browser that signed out and
+  logged in again would keep the old `socket.data.sessionId` and see `isMine: false`
+  on its own lock.
 - The module is a thin adapter: it parses nothing and keeps no state.
 
 `main.ts`:
@@ -140,6 +152,9 @@ another user's transaction still sees a current balance.
    `isMine: false`. A bad cookie must not break the realtime feed.
 6. Server close → client receives `disconnect` (no reconnection in the test; pass
    `reconnection: false`).
+7. A logged-in socket connecting makes `isNameTaken("USER1")` true; after that
+   socket closes and the session is swept past `SESSION_GRACE_MS`, it is false. This
+   is the link between presence and name uniqueness.
 
 All tests close their sockets and server in `afterEach` so Vitest exits.
 

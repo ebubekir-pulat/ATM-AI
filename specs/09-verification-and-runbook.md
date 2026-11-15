@@ -45,6 +45,10 @@ something a marker can watch happen.
 
 **Shared account (§4, §5)**
 - [ ] A logs in, B logs in with another name; both homepages show the same balance.
+- [ ] C tries A's name on the login screen: the warning appears while typing and
+      ENTER is refused. C picks another name and gets in.
+- [ ] A signs out; C can now take A's name. Close C's tab instead of signing out;
+      after about a minute the name is free.
 - [ ] A deposits `$100`; B's balance rises to match without a reload.
 - [ ] A reloads mid-transaction; the balance is still the shared one.
 
@@ -101,7 +105,7 @@ Every section of `specs.txt` and where it is satisfied.
 |-------------|-------|----------|
 | §1 Overview, objectives | 00, 01 | Architecture in `01` §1/§2; objectives restated in `00` §1 |
 | §2 ATM UI (keypad, display, look) | 03 | `ui/keypad.ts`, `ui/display.ts`, CSS sketch in `03` §1; manual checklist §3 |
-| §3 Authentication (multi-tap, A–Z, ≥3, no password) | 03, 04 | `ui/multitap.ts` tests, `sessions.ts`, `POST /api/session` |
+| §3 Authentication (multi-tap, A–Z, ≥3, no password) | 03, 04 | `ui/multitap.ts` tests, `sessions.ts`, `POST /api/session`, unique-name check and login-screen warning |
 | §4 Shared account (one balance, AUD, persisted) | 02 | `db.ts` seed + reopen test, `money.ts`, `GET /api/account` |
 | §5 Homepage (welcome, balance, 3 buttons, AI button) | 03, 04, 08 | `screens/home.ts`, `ui/assistant.ts`; live balance via 05 |
 | §6 Withdraw | 06, 07 | `account.withdraw`, `routes/transactions.ts`, amount screen |
@@ -121,7 +125,7 @@ Every section of `specs.txt` and where it is satisfied.
 
 ## 5. Concurrency proof
 
-The distributed-systems claim rests on three tests. They must exist, and they must
+The distributed-systems claim rests on four tests. They must exist, and they must
 fail if the mechanism is removed.
 
 1. **Mutual exclusion.** 20 sessions acquire concurrently; exactly one wins. Remove
@@ -132,8 +136,10 @@ fail if the mechanism is removed.
    this test fails.
 3. **No negative balance.** Twenty `$300` withdrawals from `$1,000` leave `$100.00`
    and three successes, whatever the interleaving.
+4. **Unique names.** Twenty logins with the same name at once: one 201, nineteen 409,
+   one `login` row. Remove the synchronous `isNameTaken` check and this fails.
 
-Record the actual output of these three in the project report; a screenshot of a
+Record the actual output of these four in the project report; a screenshot of a
 passing run is the evidence that the requirement is met, not the design text.
 
 ## 6. Demo script (about five minutes)
@@ -199,9 +205,12 @@ If the model name differs, set `OLLAMA_MODEL` before `npm start`.
 - **Sessions are memory-resident.** A restart logs everyone out. The balance and log
   survive, which is what §13 E requires.
 - **No passwords, by design.** The name is a label for the log, not an identity.
-  Anyone on the Wi-Fi can act as any name. That is the source spec's choice.
-- **Names are not unique.** Two people may use `ALEX`; the lock still identifies the
-  session correctly.
+  Anyone on the Wi-Fi can take a name that is free. That is the source spec's choice.
+- **Names are unique only while in use.** A name is reserved by the live session that
+  holds it and frees itself when that session ends — on sign-out, or about a minute
+  after the last browser tab on it closes. Two people therefore cannot be `ALEX` at
+  the same time, but the next day `ALEX` might be someone else. Uniqueness is a
+  coordination rule, not a security boundary.
 - **Plain HTTP.** Fine on a trusted LAN; not for anything real.
 - **The AI is only as good as the retrieved rows.** If a question needs data outside
   the 50-entry window, the assistant says so rather than guessing — that is the
@@ -215,6 +224,8 @@ If the model name differs, set `OLLAMA_MODEL` before `npm start`.
 For the person reviewing the finished code, in addition to `reviewing.md`:
 
 - [ ] `acquire` in `lock.ts` contains no `await` and no async signature.
+- [ ] The name uniqueness check and `createSession` in `POST /api/session` sit in one
+      synchronous stretch, with no `await` between the check and the create.
 - [ ] Every mutating handler has exactly one `db.transaction`.
 - [ ] No route broadcasts before its commit.
 - [ ] No client computes a balance; every balance on screen came from a response or

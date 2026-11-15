@@ -127,16 +127,15 @@ Release points, in one table — every row is a test:
 | User signs out while holding it | `DELETE /api/session` | `logout` |
 | Owning session's last socket disconnects | `realtime.ts` `disconnect` | none |
 | Lease expires with nobody renewing | `sweepExpired` / any `getLock` | none |
-| Idle session swept (slice 04) | `index.ts` sweep | none |
+| Session swept past its grace (slice 04) | `index.ts` sweep | none |
 
 ## 6. Disconnect and timeout handling
 
 - `attachRealtime` registers `socket.on("disconnect")`. It releases the lock if
-  `socket.data.sessionId` owns it **and** no other connected socket belongs to that
-  session. Socket.IO does not tell us how many sockets a session has, so
-  `realtime.ts` keeps `Map<sessionId, Set<socketId>>` updated on connection and
-  disconnection. A user with two tabs open therefore keeps the lock when one tab
-  closes, and loses it when the second closes.
+  `socket.data.sessionId` owns it **and** the session's socket count has dropped to
+  zero. The count and the `Map<sessionId, Set<socketId>>` come from slice 05. A user
+  with two tabs open therefore keeps the lock when one tab closes, and loses it when
+  the second closes.
 - `index.ts` starts `setInterval(() => { if (sweepExpired()) broadcastLockState(); }, 1000)`.
   1 s granularity is enough: the lease is 30 s, and a refusal message is never more
   than one second stale.
@@ -219,6 +218,7 @@ a renewal sent alongside it would come back `409 LOCK_LOST` and show a false
 - Sign-out while holding → `GET /api/lock` as B → free.
 - **Race:** 20 fresh sessions fire `POST /api/lock` concurrently with `Promise.all`.
   Exactly one 201, nineteen 423, and `getLock()` names the winner. Repeat 5 times.
+  (Twenty distinct names — slice 04 forbids duplicates.)
 
 `tests/server/transactions-lock.test.ts`
 - Deposit/withdraw with no lock → 409 `LOCK_NOT_HELD`, balance and log unchanged.
