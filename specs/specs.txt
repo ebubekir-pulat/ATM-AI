@@ -1,0 +1,268 @@
+Project: Local Network ATM System
+Distributed Systems Project
+ Web Application
+
+1. Project Overview
+Develop a simple, web-based ATM simulation hosted on a single computer and accessible to multiple users connected to the same local Wi-Fi network.
+
+The application simulates a shared bank account where all users interact with the same account balance, regardless of their login name.
+
+The primary objective is to demonstrate distributed systems concepts and AI agent applications, particularly:
+- Shared state across multiple clients.
+- Concurrent access to shared resources.
+- Mutual exclusion and transaction locking.
+- Race condition prevention.
+- Centralised transaction and activity logging.
+- AI-powered querying of historical activity logs.
+The application will consist of a frontend ATM interface and a central backend server responsible for managing account state, transactions, locking, and logging.
+
+2. ATM User Interface
+The application should resemble a traditional physical ATM.
+
+ATM keypad:
+- Numeric buttons (0–9).
+- Yellow Clear button: Clears the current input.
+- Red Back button: Deletes the last entered character or returns to the previous screen, depending on context.
+- Green Enter button: Confirms the current input.
+
+ATM display:
+- Displays welcome messages, instructions, available options, and account information.
+- Shows the characters or numbers currently being entered.
+- Provides feedback for successful and unsuccessful operations.
+
+The interface should be simple, intuitive, and visually resemble a traditional ATM.
+
+3. User Authentication
+Users must log in before accessing the account.
+
+Login process:
+1. Display a welcome/login screen.
+2. Ask the user to enter their name using the numeric keypad.
+3. Implement Multi-Tap Texting, where users press numeric keys multiple times to generate alphabetic characters, similar to old mobile phone keypads.
+4. Only uppercase alphabetic characters (A–Z) are accepted.
+5. Names must contain at least three characters.
+6. Once the user presses Enter, validate their name and log them in.
+
+For simplicity, authentication does not require passwords. The username identifies the user for activity logging purposes.
+
+4. Shared Bank Account
+All logged-in users access one centralised bank account.
+
+The account must have:
+- One globally shared balance.
+- A balance displayed in AUD ($).
+- A balance accessible to all connected clients.
+- A balance that persists even if the server or browser is restarted.
+The account balance must be stored and managed centrally by the backend rather than independently by individual clients.
+
+When a user logs in, their homepage displays the latest account balance.
+
+5. Homepage
+After successfully logging in, users are presented with the main ATM dashboard.
+
+The homepage should display:
+- Welcome message containing the user's name.
+- Current shared bank balance.
+- Withdraw button.
+- Deposit button.
+- Sign Out button.
+
+Note: There is always an AI Assistant button, positioned in the bottom-right corner, outside the ATM UI, on a white background.
+
+Users should be able to view the account balance even when another user is performing a transaction.
+
+6. Withdraw Functionality
+When a user selects Withdraw:
+1. The backend checks whether another user currently holds the transaction lock.
+2. If the account is locked, the user is informed that another transaction is in progress.
+3. Otherwise, the user acquires the transaction lock.
+4. The user is taken to the withdrawal screen.
+5. The user enters the desired withdrawal amount using the numeric keypad.
+6. The withdrawal amount cannot exceed the available account balance.
+7. The user presses Enter to confirm.
+8. The backend validates and processes the transaction.
+9. The shared balance is updated.
+10. The transaction is recorded in the activity log.
+11. The transaction lock is released.
+12. The user is returned to the homepage with the updated balance.
+
+Users can withdraw any positive amount up to the current available balance.
+
+7. Deposit Functionality
+When a user selects Deposit:
+1. The backend checks whether another user currently holds the transaction lock.
+2. If the account is locked, the user is informed that another transaction is in progress.
+3. Otherwise, the user acquires the transaction lock.
+4. The user is taken to the deposit screen.
+5. The user enters the desired deposit amount using the numeric keypad.
+6. Deposits must be positive and cannot exceed $10,000 per transaction.
+7. The user presses Enter to confirm.
+8. The backend validates and processes the deposit.
+9. The shared balance is updated.
+10. The transaction is recorded in the activity log.
+11. The transaction lock is released.
+12. The user is returned to the homepage with the updated balance.
+
+8. Distributed Transaction Locking
+Core Distributed Systems Requirement
+Only one user may perform a deposit or withdrawal at any given time.
+
+This is a central requirement of the project.
+
+The backend must implement a centralised mutual exclusion mechanism to prevent concurrent transactions from modifying the shared account balance simultaneously.
+
+Locking requirements:
+- Only one client can acquire the transaction lock at a time.
+- The lock must be managed centrally by the backend.
+- Other users can still log in and view the shared balance while a transaction is in progress.
+- Other users attempting to deposit or withdraw must receive a message indicating that the account is currently locked.
+- The lock must be released after a successful transaction.
+- The lock must also be released if a transaction is cancelled or fails.
+- The system must prevent stale locks from permanently blocking transactions if a client disconnects unexpectedly.
+
+Important implementation consideration:
+
+The locking mechanism must be enforced server-side, not just through frontend button disabling. This ensures that multiple clients cannot bypass the restriction by sending simultaneous backend requests.
+
+9. Shared Activity Log
+All application activity must be recorded in a centralised activity log stored on the hosting computer.
+
+The log should record:
+Event	Information recorded
+Login	Username and timestamp
+Logout	Username and timestamp
+Withdrawal	Username, amount and timestamp
+Deposit	Username, amount and timestamp
+
+Example log:
+User1: Logged in at 12:30:45
+User2: Logged in at 12:35:50
+User1: Withdrew $5000 at 12:40:00
+User1: Logged out at 12:41:00
+
+Times are local time zone times.
+
+Logging requirements:
+- Logs must be shared across all connected clients.
+- Logs must persist on the hosting computer.
+- All timestamps must use the server's local timezone.
+- Events must be recorded in chronological order.
+- Logs must accurately reflect completed transactions.
+- Failed transactions and cancelled operations should also be recorded where appropriate.
+
+The activity log will serve as the source of truth for the AI assistant.
+
+10. AI Assistant
+AI Feature
+Implement a simple AI-powered assistant accessible through a floating button in the bottom-right corner of the application.
+
+Clicking the button opens a small chat interface without navigating away from the ATM page.
+
+Users can ask natural-language questions about the shared account's activity.
+
+Example questions:
+- "Why is the balance $5,000 lower than when I last logged in?"
+- "Who made the last withdrawal?"
+- "How much money has been deposited today?"
+- "Show me the last five transactions."
+- "Who withdrew $5,000 at 12:30?"
+- "What happened to the account balance over the last hour?"
+
+Example interaction:
+
+User:
+
+"Why is there $5,000 less than when I last logged in?"
+
+AI Assistant:
+
+"User3 withdrew $5,000 at 12:30:55. This transaction reduced the shared account balance by $5,000."
+
+AI requirements:
+- The assistant must answer questions using the centralised activity log.
+- It should understand natural-language questions.
+- It should retrieve relevant log entries to formulate answers.
+- It must not invent transactions, users, timestamps, or account activity.
+- If the logs do not contain enough information to answer a question, it should clearly state that.
+- It must not have permission to deposit, withdraw, or modify the account balance.
+- It should be accessible to all logged-in users.
+
+The AI assistant should function as a read-only interface to the account's historical activity.
+
+11. Sign Out
+Users must be able to sign out from the homepage.
+
+When a user signs out:
+1. Their session is terminated.
+2. A logout event is recorded in the shared activity log.
+3. They are redirected to the login screen.
+
+If a user disconnects unexpectedly, the system should handle session cleanup appropriately.
+
+12. Technical Architecture
+The application should follow a centralised client-server architecture.
+Client Devices
+
+User 1 · User 2 · User 3 · ...
+
+Web browsers connected to the same Wi-Fi
+
+HTTP / WebSocket communication
+
+Central Backend Server
+Account Manager: Shared balance
+
+Lock Manager: Mutual exclusion
+
+Activity Logger: Persistent event history
+
+AI Assistant: Read-only log queries
+
+
+Persistent Storage
+Shared account balance · Activity logs · Session / transaction state
+
+
+Suggested technology stack:
+Frontend:	HTML, CSS, TypeScript
+Backend:	Node.js with Express
+Real-time updates:	WebSockets (Socket.IO)
+Persistent storage:	SQLite
+AI integration:	Local LLM inference with controlled log retrieval via Ollama
+Hosting:	Local computer on Wi-Fi network
+
+
+13. Additional Requirements and Design Decisions
+
+A. Real-time balance updates
+
+If User1 deposits $500 while User2 is viewing the homepage, User2's displayed balance should automatically update without refreshing the browser.
+
+Use WebSockets to broadcast balance changes to all connected clients.
+
+B. Transaction cancellation
+
+If a user enters the withdrawal or deposit screen but decides to cancel, they should be able to return to the homepage without modifying the balance. The lock must be released immediately.
+
+C. Transaction lock timeout
+
+If a user closes their browser while holding a transaction lock, the system must not remain locked indefinitely. Implement a server-managed timeout or lease mechanism.
+
+D. Atomic transactions
+
+Balance validation, balance modification, and transaction logging should be performed safely on the backend. Use database transactions to ensure that a failed operation cannot leave the account in an inconsistent state.
+
+E. Initial account balance
+
+Define an initial balance when the application is first launched. For example, $1,000. Subsequent restarts must preserve the existing balance rather than resetting it.
+
+F. AI accuracy
+
+The AI should never independently guess what happened to the balance. It should retrieve actual log records and use those records as its evidence.
+
+14. Final Project Objective
+The finished application should allow multiple people on the same Wi-Fi network to interact with a single simulated bank account through an ATM-style web interface.
+
+It should demonstrate how a central server coordinates multiple clients accessing shared resources, prevents race conditions through mutual exclusion, maintains consistent account state, and records all activity in a persistent shared log.
+
+An integrated AI assistant will provide a natural-language interface for querying historical account activity, allowing users to understand transactions and changes to the shared balance.
