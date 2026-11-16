@@ -55,7 +55,7 @@ Copied from the source spec and from `AGENTS.md`. They apply to every slice.
   floating-point number on the wire. Balance and amounts are integer **cents**.
 - **Timestamps are the server's local timezone.** Every log entry stores the
   server-local date and time as a string, rendered by the server. Clients never
-  reformat a timestamp, so a phone in another timezone still shows Sydney time.
+  reformat a timestamp, so a phone in another timezone still shows the server's time.
 - **Locking is enforced on the server.** Client-side disabling is a courtesy,
   never the mechanism.
 - **Balance and logs persist** across server and browser restarts.
@@ -67,16 +67,16 @@ Copied from the source spec and from `AGENTS.md`. They apply to every slice.
   the problem.
 - **One shared account.** There is no per-user balance anywhere in the system.
 - **Uppercase A–Z only** for names; names are at least 3 characters.
-- **Login names are unique while in use.** A second person who picks the same name
-  is stopped on the login page, and the server is what stops them. A name is free
-  again when its session ends.
+- **Login names are unique in the database.** A second person who picks the same name
+  is stopped on the login page, and the server is what stops them. Once a user
+  logs in with a certain name, no user can use that name as long as its in the database.
 
 ## 4. Terms
 
 | Term | Meaning |
 |------|---------|
 | **Session** | One logged-in browser. Identified by an httpOnly cookie `atm_sid`. |
-| **Name** | The uppercase A–Z label a person logs in with. Unique among live sessions. |
+| **Name** | The uppercase A–Z label a person logs in with. Unique in the database. |
 | **Client** | A browser tab running the ATM. |
 | **Lock** | The single transaction lock. Owned by at most one session at a time. |
 | **Lease** | The expiry time of the lock; the owner renews it while on an amount screen. |
