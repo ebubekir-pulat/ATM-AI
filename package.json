@@ -1,0 +1,13 @@
+{
+  "name": "atm-ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server/index.js",
+    "dev": "npm run build && node --watch dist/server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": { "node": ">=20" }
+}
