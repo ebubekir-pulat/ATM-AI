@@ -171,6 +171,7 @@ Base path `/api`. JSON in, JSON out. The session cookie is the only credential.
 | 423 | `ACCOUNT_LOCKED` | Lock requested while another session owns it |
 | 503 | `ASSISTANT_UNAVAILABLE` | Ollama unreachable or timed out |
 | 500 | `INTERNAL` | Anything unexpected; details are logged, not returned |
+| 404 | `NOT_FOUND` | No route matches the request |
 
 ### 6.2 Types
 

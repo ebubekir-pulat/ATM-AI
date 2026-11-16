@@ -12,6 +12,9 @@ function intEnv(name: string, fallback: number): number {
 function lanAddresses(): string[] {
   const addresses: string[] = [];
   for (const interfaces of Object.values(os.networkInterfaces())) {
+    if (!interfaces) {
+      continue;
+    }
     for (const net of interfaces) {
       if (net && net.family === "IPv4" && !net.internal) {
         addresses.push(net.address);
