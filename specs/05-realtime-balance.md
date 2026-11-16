@@ -1,58 +1,49 @@
 # 05 — Real-Time Balance and Lock Broadcasts
 
 **Depends on:** `02`, `04`.
-**Delivers:** Socket.IO wired end to end. A balance change made in one browser
-appears in every other browser without a reload, with a visible connection state.
-**Covers:** `specs.txt` §5 ("view the balance even when another user is
-transacting"), §13 A (real-time updates), and the transport half of §12.
+**Delivers:** Socket.IO wired end to end. A balance change in one browser appears in
+every other browser without a reload, with a visible connection state.
+**Covers:** `specs.txt` §5 ("view the balance even when another user is transacting"),
+§13 A, and the transport half of §12.
 
 ---
 
-## 1. Rules this slice must satisfy
+## 1. Rules
 
-1. Every connected browser sees `account:updated` within a second of the change.
-2. No client ever computes a balance; it only displays the one it was sent.
-3. A browser that reconnects repairs its own state, even if it missed events.
+1. Every connected browser sees `account:updated` within a second.
+2. No client computes a balance; it displays what it was sent.
+3. A reconnecting browser repairs its own state, even if it missed events.
 4. An event is only ever sent **after** the database write committed.
-5. Browsers that are not logged in receive events too, but ignore them. They are
-   not an error path; the page may be sitting on the login screen.
-6. Nothing here writes any state. The socket carries information only.
+5. Not-logged-in browsers receive events and ignore them.
+6. Nothing here writes state. The socket carries information only.
 
-## 2. Files
+Files: create `src/server/realtime.ts`, `src/client/realtime.ts`; modify
+`index.ts` (HTTP server, Socket.IO, graceful shutdown), `main.ts`, `state.ts`,
+`atm.css` (status dot). Tests: `tests/server/realtime.test.ts`.
 
-Create: `src/server/realtime.ts`, `src/client/realtime.ts`.
-Modify: `src/server/index.ts` (create an `http.Server`, attach Socket.IO,
-graceful shutdown), `src/server/app.ts` (no change to routes), `src/client/main.ts`
-(socket boot and handlers), `src/client/state.ts` (connection status),
-`public/css/atm.css` (status dot). Tests: `tests/server/realtime.test.ts`.
+## 2. Server
 
-## 3. Server
+Signatures in `01` §9.
 
-```ts
-export function attachRealtime(server: http.Server, deps: { db: Database }): SocketIOServer;
-export function broadcastAccount(account: Account): void;
-export function broadcastActivity(entry: ActivityEntry): void;
-export function broadcastLockState(): void;   // recomputed per socket
-export function getIo(): SocketIOServer | null; // for tests and slice 07
-```
-
-- `attachRealtime` is called once, from `index.ts`. `app.ts` stays listen-free and
-  socket-free so Supertest tests never start a socket server by accident.
-- On connection, resolve the session from the handshake cookie:
-  `readSessionId(socket.handshake.headers.cookie)` → `getSession(id)`, and store
-  `socket.data.sessionId` and `socket.data.userName` (both `null` when absent).
-- Keep `Map<sessionId, Set<socketId>>` in this module and call
-  `setSessionSockets(sessionId, set.size)` on every connection and disconnection.
-  That count is what ends a session — and frees its name — `SESSION_GRACE_MS` after
-  the last socket goes. Slice 07 uses the same map to release a lock.
-- Immediately after `connection`, send that socket the current `account:updated`
-  and `lock:updated` payloads, so the first paint does not need a round trip.
-  Slice 07 owns the lock payload; until then emit
-  `{ lock: { locked: false, ownerName: null, isMine: false, expiresAtMs: null } }`.
-- `broadcastAccount` sends `{ account }` to every socket.
-- `broadcastActivity` sends `{ entry }` to every socket.
-- `broadcastLockState` sends `{ lock }` per socket, because `isMine` depends on
-  **who is receiving it**:
+- `attachRealtime` is called once from `index.ts`. `app.ts` stays listen-free and
+  socket-free so Supertest never starts a socket server by accident.
+- On connection, resolve the session from the handshake cookie
+  (`readSessionId(socket.handshake.headers.cookie)` → `getSession(id)`) and store
+  `socket.data.sessionId` / `socket.data.userName` (both `null` when absent).
+- Keep `Map<sessionId, Set<socketId>>` here and call
+  `setSessionSockets(sessionId, set.size)` on every connection and disconnection. The
+  last disconnection starts the `SESSION_GRACE_MS` countdown that ends the session and
+  releases its lock; the name then becomes available to another session, while its
+  `user_names` row stays. Slice 07 uses the same map to release a lock.
+- Immediately after `connection`, send that socket the current `account:updated` and
+  `lock:updated`, so the first paint needs no round trip. Until slice 07, `getLockState`
+  is a local stub returning `{ locked: false, ownerName: null, isMine: false,
+  expiresAtMs: null }`; slice 07 swaps in the real one and the loop below does not
+  change.
+- `broadcastAccount` sends `{ account }` and `broadcastActivity` sends `{ entry }` to
+  every socket.
+- `broadcastLockState()` takes no argument and reads the lock per socket, because
+  `isMine` depends on the receiver:
 
 ```ts
 for (const socket of io.sockets.sockets.values()) {
@@ -60,25 +51,17 @@ for (const socket of io.sockets.sockets.values()) {
 }
 ```
 
-Until slice 07, `getLockState` is a local stub that always returns
-`{ locked: false, ownerName: null, isMine: false, expiresAtMs: null }`; slice 07
-replaces it with the real one from `lock.ts`, and this loop does not change.
-
 This is the only per-socket send in the system. The lock is held by a *session*, so
-`isMine` is computed from the receiver's session id rather than by having each
-client compare `ownerName`. Names are unique among live sessions, but they are still
-a label; the session id is the identity.
+`isMine` comes from the session id, not from comparing `ownerName`.
+- No `socket.on(...)` handlers except the `disconnect` hook added by slice 07; clients
+  send no commands.
+- Graceful shutdown on `SIGINT`/`SIGTERM`: close the socket server, the HTTP server and
+  the database. A LAN demo is stopped with Ctrl-C all the time.
 
-- No `socket.on(...)` handlers except the `disconnect` hook added by slice 07.
-  Clients do not send commands over the socket.
-- Graceful shutdown on `SIGINT`/`SIGTERM`: close the socket server, close the HTTP
-  server, close the database. A LAN demo is stopped with Ctrl-C all the time.
-
-## 4. Client
-
-`src/client/realtime.ts`:
+## 3. Client
 
 ```ts
+// src/client/realtime.ts — thin adapter: parses nothing, keeps no state
 export function connectRealtime(handlers: {
   onAccount: (account: Account) => void;
   onLock: (lock: LockState) => void;
@@ -89,95 +72,71 @@ export function refreshSession(): void; // drop and re-open the socket
 ```
 
 - Uses the global `io` from `/socket.io/socket.io.js` (type-only import from
-  `socket.io-client`). Same origin, so the cookie is sent automatically.
-- No options except `reconnectionDelayMax: 3000` — a slow reconnect makes the demo
-  look broken.
-- `connect` → `onStatus("connected")`, then re-fetch `getAccount()` and push it
-  through `onAccount`. Slice 07 adds `getLock()` to the same handler, once the
-  endpoint exists.
-- `disconnect` → `onStatus("connecting")` while Socket.IO keeps trying;
-  `reconnect_failed` and `connect_error` after the first attempt →
-  `onStatus("offline")`.
-- `refreshSession` is `socket.disconnect(); socket.connect();`. The socket reads the
-  session cookie **only during the handshake**, so `main.ts` calls it right after a
-  successful login and after sign-out. Without it, a browser that signed out and
-  logged in again would keep the old `socket.data.sessionId` and see `isMine: false`
-  on its own lock.
-- The module is a thin adapter: it parses nothing and keeps no state.
+  `socket.io-client`). Same origin, so the cookie is sent automatically. Only option:
+  `reconnectionDelayMax: 3000`.
+- `connect` → `onStatus("connected")`, then re-fetch `getAccount()` and push it through
+  `onAccount`. Slice 07 adds `getLock()` to the same handler.
+- `disconnect` → `onStatus("connecting")` while Socket.IO retries; `reconnect_failed`
+  and a failed `connect_error` → `onStatus("offline")`.
+- `refreshSession` is `socket.disconnect(); socket.connect();` — the socket reads the
+  cookie **only during the handshake**, so `main.ts` calls it after a successful login
+  and after sign-out. Without it, a browser that signed out and back in would keep the
+  old `sessionId` and see `isMine: false` on its own lock.
 
-`main.ts`:
+`main.ts` calls `connectRealtime` once, after the slice 04 boot sequence:
 
-- Call `connectRealtime` once, after the boot sequence in slice 04.
-- `onAccount` → `state.balanceCents = account.balanceCents`, re-render. Only when
-  `screen` is `home` or `amount`; on `login` the value is stored for later.
+- `onAccount` → `state.balanceCents = account.balanceCents`, re-render on `home` or
+  `amount`; on `login` store it for later.
 - `onLock` → `state.lock = lock`, re-render.
-- `onActivity` → keep the last 20 entries in `state.recentActivity` (slice 08 uses
-  them); nothing visible yet.
+- `onActivity` → keep the last 20 entries in `state.recentActivity`; nothing visible yet.
 - `onStatus` → `state.connection = status`.
 
-The connection dot sits in the ATM frame's header strip: a `10px` circle plus text
-`Live` (green), `Reconnecting…` (amber), `Offline` (red). It is decorative for the
-demo but it is the fastest way to notice that a phone has dropped off the Wi-Fi.
-It has `role="status"` and `aria-live="polite"`.
+Connection dot in the frame's header strip: `10px` circle plus `Live` (green),
+`Reconnecting…` (amber), `Offline` (red), with `role="status"` and `aria-live="polite"`.
+It is decorative, but it is the fastest way to notice a phone dropped off the Wi-Fi.
 
-If the page is on the login screen when an `account:updated` arrives, nothing is
-drawn; the value is used as soon as `home` renders, so a user who logs in during
-another user's transaction still sees a current balance.
+A balance that arrives while the page is on `login` is stored and used as soon as
+`home` renders, so a user who logs in during someone else's transaction sees a current
+balance.
 
-## 5. Ordering guarantees
+## 4. Ordering guarantees
 
 - Every broadcast is called from a route handler **after** its `db.transaction()`
-  returned, so no client can observe a balance that is not yet stored.
-- Two writes in a row may produce two broadcasts in order; Socket.IO preserves
-  per-socket order, so the last value wins on the client as it should.
-- A client that missed a broadcast (asleep phone, closed lid) is repaired by the
-  `connect` handler's re-fetch. No event log replay is needed, because every event
-  carries the full current value rather than a delta.
+  returned, so no client can observe an unstored balance.
+- Socket.IO preserves per-socket order, so two writes produce two broadcasts in order
+  and the last value wins.
+- Because every event carries the full current value rather than a delta, a client that
+  missed one is repaired by the `connect` re-fetch. No replay needed.
 
-## 6. Tests
+## 5. Tests
 
 `tests/server/realtime.test.ts` starts a real server on port `0`:
 
-1. Connect a `socket.io-client` with no cookie → receives `account:updated` with
-   the seeded balance and `lock.ownerName === null`.
-2. `POST /api/session` for a valid name → the connected socket receives
-   `activity:created` with `eventType: "login"` and the same `userName`.
-3. Change the balance directly (`db.prepare("UPDATE account SET balance_cents = ?")`)
-   and call `broadcastAccount(getAccount(db))` → the socket receives
-   `account:updated` with the new value.
-4. Two sockets, one logged in as `USER1`: `broadcastLockState()` with a lock held
-   by `USER1` → the logged-in socket gets `isMine: true`, the anonymous socket gets
-   `isMine: false` and `ownerName: "USER1"`.
-5. Malformed cookie (`atm_sid=not-a-session`) → connection succeeds, payloads have
-   `isMine: false`. A bad cookie must not break the realtime feed.
-6. Server close → client receives `disconnect` (no reconnection in the test; pass
-   `reconnection: false`).
-7. A logged-in socket connecting makes `isNameTaken("USER1")` true; after that
-   socket closes and the session is swept past `SESSION_GRACE_MS`, it is false. This
-   is the link between presence and name uniqueness.
+1. Socket with no cookie → `account:updated` with the seeded balance and
+   `lock.ownerName === null`.
+2. `POST /api/session` → the socket gets `activity:created` with
+   `eventType: "login"` and that `userName`.
+3. `UPDATE account SET balance_cents = ?` then `broadcastAccount(getAccount(db))` → the
+   socket gets the new value.
+4. Two sockets, `USER1` logged in, `broadcastLockState()` with a lock held by `USER1` →
+   the logged-in socket gets `isMine: true`, the anonymous one `isMine: false` and
+   `ownerName: "USER1"`.
+5. Malformed cookie (`atm_sid=not-a-session`) → connection succeeds with `isMine: false`.
+6. Server close → client gets `disconnect` (pass `reconnection: false`).
+7. A logged-in socket keeps its session live (`GET /api/session` → 200); after the last
+   socket closes and the session is swept past `SESSION_GRACE_MS`, the same cookie is
+   401 — the link between presence and session lifetime.
 
-All tests close their sockets and server in `afterEach` so Vitest exits.
+Every test closes its sockets and server in `afterEach` so Vitest exits.
 
-## 7. Acceptance criteria
+## 6. Acceptance criteria
 
-- [ ] Two browsers on the homepage. Change the balance in the database by hand
-      (`UPDATE account SET balance_cents = 250000 WHERE id = 1`, then restart or
-      trigger any transaction later) — the other browser updates without a reload.
-- [ ] Killing the server turns both dots amber, then red; starting it again turns
-      them green and the balance re-syncs.
+- [ ] Two browsers on the homepage; `UPDATE account SET balance_cents = 250000 WHERE id
+      = 1` (plus a later transaction or restart) updates the other browser without a
+      reload.
+- [ ] Killing the server turns both dots amber, then red; restarting turns them green
+      and re-syncs the balance.
 - [ ] A phone that sleeps and wakes re-syncs on its own within three seconds.
-- [ ] Logging in and signing out produces `activity:created` on the other browser's
-      socket (verified in the console during development).
+- [ ] Login and sign-out produce `activity:created` on the other browser's socket.
 - [ ] No route handler broadcasts before its transaction commits.
-- [ ] `npm test` passes, and `npm test` exits without open handles.
-
-## 8. Refinement to `01`
-
-`01` §9 originally left `broadcastLock` per-socket shape open. This slice fixes it:
-
-```ts
-export function broadcastLockState(): void;  // no argument; reads the lock itself
-```
-
-The lock state is read fresh for each socket, so a caller cannot broadcast a stale
-`isMine`. Slice 07 relies on this signature.
+- [ ] `npm test` passes and exits without open handles.

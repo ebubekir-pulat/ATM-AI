@@ -1,11 +1,10 @@
 # 01 — Contracts
 
 **Depends on:** nothing.
-**Delivers:** the one place where names, paths, types, endpoints, events and the
-database schema are defined. Every later slice builds against this file.
-**Covers:** `specs.txt` §4, §9 (storage), §12 (architecture), §13 D/E.
-
-If a slice needs something that is not here, it is added here first.
+**Delivers:** the single definition of every name, path, type, endpoint, event and
+table column. Later slices build against it; a slice that needs something new adds it
+here first.
+**Covers:** `specs.txt` §4, §9 (storage), §12, §13 D/E.
 
 ---
 
@@ -13,21 +12,20 @@ If a slice needs something that is not here, it is added here first.
 
 Open source, installed with `npm`. Nothing else.
 
-| Concern | Choice | Why |
-|---------|--------|-----|
-| Runtime | Node.js 20 LTS or newer | Required by the tooling below. |
-| Language | TypeScript, `strict: true` | Server and client are the same language. |
-| HTTP | Express 4 | Smallest thing that serves JSON and static files. |
-| Realtime | Socket.IO 4 | Reconnect and room handling come for free. |
-| Storage | SQLite via `better-sqlite3` | Synchronous API, so a check-and-update cannot interleave with another request; `db.transaction()` gives atomicity. |
-| Frontend | HTML + CSS + TypeScript modules, no framework | The ATM is five screens and a keypad. |
-| AI | Ollama, HTTP API `http://127.0.0.1:11434` | Local inference, no cloud, no API key. |
-| Tests | Vitest + Supertest | TypeScript runs without a build step; Supertest drives Express in-process. |
+| Concern | Choice |
+|---------|--------|
+| Runtime | Node.js 20 LTS or newer |
+| Language | TypeScript, `strict: true`, server and client |
+| HTTP | Express 4 |
+| Realtime | Socket.IO 4 |
+| Storage | SQLite via `better-sqlite3` — synchronous API, so a check-and-update cannot interleave with another request; `db.transaction()` gives atomicity |
+| Frontend | HTML + CSS + TypeScript modules; no framework, no bundler |
+| AI | Ollama over HTTP, `http://127.0.0.1:11434` — local inference, no cloud, no key |
+| Tests | Vitest + Supertest |
 
-**Commands over HTTP, events over WebSocket.** Anything that changes state is an
-HTTP request that returns the new state. WebSocket is only used to *tell* the
-other clients what changed. This keeps every rule in one place (the request
-handler) and keeps clients from needing to agree on a protocol for actions.
+**Commands over HTTP, events over WebSocket.** Every state change is an HTTP request
+that returns the new state; the socket only tells other clients what changed. That
+keeps each rule in one place — the request handler.
 
 ## 2. Repository layout
 
@@ -35,110 +33,100 @@ handler) and keeps clients from needing to agree on a protocol for actions.
 package.json
 tsconfig.json              server build  -> dist/
 tsconfig.client.json       client build  -> public/js/
-.gitignore                 must contain: node_modules/ dist/ data/ public/js/
+.gitignore                 node_modules/ dist/ data/ public/js/
 data/atm.db                created at runtime, never committed
 src/server/
-  index.ts                 creates the app, listens on HOST:PORT
+  index.ts                 create app, listen on HOST:PORT, banner, sweepers, shutdown
   app.ts                   express app + routes + static files (no listen, for tests)
-  config.ts                every constant and env var in §3
+  config.ts                §3
   db.ts                    open, migrate, seed the account
   money.ts                 cents <-> dollars, formatAUD, parseDigits
   time.ts                  server-local date/time strings
-  sessions.ts              in-memory session store
-  lock.ts                  LockManager (slice 07)
+  sessions.ts              in-memory session store (04)
+  names.ts                 name registry: ensureName (04)
+  lock.ts                  LockManager (07)
   account.ts               getBalance, withdraw, deposit
-  activity.ts              recordEvent, listEntries
-  retrieval.ts             turns a question into log rows + computed totals
-  ollama.ts                thin HTTP client for Ollama
-  assistant.ts             answerQuestion (slice 08)
-  realtime.ts              Socket.IO setup and broadcast helpers
+  activity.ts              recordEvent, listEntries, toPublicEntry
+  retrieval.ts             question -> log rows + computed totals (08)
+  ollama.ts                thin HTTP client for Ollama (08)
+  assistant.ts             answerQuestion (08), read path only
+  realtime.ts              Socket.IO setup and broadcasts
   http/
-    requireSession.ts      route middleware: 401 when no session
-    errors.ts              ApiError + error middleware
-    routes/account.ts      GET  /api/account
-    routes/session.ts      POST/GET/DELETE /api/session
+    requireSession.ts      401 when no session
+    errors.ts             ApiError + error middleware
+    routes/account.ts      GET /api/account
+    routes/session.ts      POST/GET/DELETE /api/session, GET availability
     routes/transactions.ts POST /api/transactions/withdraw|deposit
-    routes/lock.ts         POST /api/lock, POST /api/lock/renew, DELETE /api/lock, GET /api/lock
-    routes/activity.ts     GET  /api/activity
+    routes/lock.ts         POST/GET /api/lock, POST /api/lock/renew, DELETE /api/lock
+    routes/activity.ts     GET /api/activity
     routes/assistant.ts    POST /api/assistant/chat
-src/shared/
-  types.ts                 Account, ActivityEntry, LockState, Session — types only
+src/shared/types.ts        Account, ActivityEntry, LockState, Session — types only
 src/client/
   main.ts                  bootstrap, socket wiring, screen switching
-  state.ts                 the client's single state object
-  api.ts                   typed fetch wrappers for the endpoints in §6
-  screens/login.ts         name entry
-  screens/home.ts          welcome, balance, buttons
-  screens/amount.ts        withdraw / deposit amount entry
-  screens/message.ts       result and error feedback
-  ui/keypad.ts             the 15 buttons
-  ui/display.ts            the screen area inside the ATM
-  ui/multitap.ts           key presses -> text (pure, unit tested)
-  ui/money.ts              formatAUD for display only (no arithmetic)
-  ui/assistant.ts          floating button + chat panel
-  realtime.ts              Socket.IO client adapter (slice 05)
+  state.ts                 the single state object, reduce(), setScreen()
+  api.ts                   typed fetch wrappers for §6
+  realtime.ts              Socket.IO client adapter (05)
+  screens/{login,home,amount,message}.ts
+  ui/{keypad,display,multitap,money,assistant}.ts
 public/
   index.html
   css/atm.css
-  js/                      output of tsconfig.client.json (generated)
-tests/
-  server/*.test.ts         Vitest + Supertest
-  client/*.test.ts         pure client logic (no DOM)
+  js/                      generated by tsconfig.client.json
+tests/server/*.test.ts     Vitest + Supertest
+tests/client/*.test.ts     pure client logic, no DOM
 ```
 
-**Dependency direction:** `routes → account|activity|lock|assistant →
+**Dependency direction:** `routes → account|activity|lock|assistant|names →
 db|sessions|money|time`. Nothing imports upward. `assistant.ts` may import
-`retrieval.ts`, `activity.ts` and `ollama.ts`, and **must not** import `account.ts`
-or `lock.ts`. That import rule is how the read-only guarantee is enforced.
+`retrieval`, `activity` and `ollama`, and **must not** import `account` or `lock` —
+that import rule is how the read-only guarantee is enforced.
 
-**Client imports** use explicit `.js` extensions (`import { x } from "./ui/keypad.js"`)
-because the browser loads the compiled files as native ES modules. There is no
-bundler.
-
-**Type-only imports** from `socket.io-client` are allowed; the runtime client
-comes from `/socket.io/socket.io.js`, loaded by `index.html` before `main.js`.
+Client code imports with explicit `.js` extensions (`./ui/keypad.js`) because the
+browser loads compiled native ES modules. Shared types are imported with
+`import type` only.
 
 ## 3. Configuration
 
-`config.ts` reads the environment once and exports constants. Defaults are what
-the LAN demo uses.
+`config.ts` reads the environment once and exports constants. Defaults are what the
+LAN demo uses. It also exports `LAN_URLS: string[]` (every non-internal IPv4 address
+from `os.networkInterfaces()`) for the startup banner.
 
 | Constant | Env var | Default | Meaning |
 |----------|---------|---------|---------|
-| `PORT` | `PORT` | `3000` | HTTP and WebSocket port. |
-| `HOST` | `HOST` | `0.0.0.0` | Bind to every interface so phones can reach it. |
-| `DB_PATH` | `DB_PATH` | `data/atm.db` | SQLite file; tests pass `:memory:`. |
-| `INITIAL_BALANCE_CENTS` | `INITIAL_BALANCE_CENTS` | `100000` | $1,000.00, used once, when the database is created. |
-| `MAX_DEPOSIT_CENTS` | — | `1000000` | $10,000.00 per deposit. |
-| `MAX_AMOUNT_DIGITS` | — | `7` | Keypad buffer limit for amounts. |
-| `MIN_NAME_LENGTH` | — | `3` | From the source spec. |
-| `MAX_NAME_LENGTH` | — | `20` | UI buffer limit; not a source-spec rule. |
-| `MULTITAP_WINDOW_MS` | — | `800` | Press window for cycling letters on one key. |
-| `LOCK_LEASE_MS` | `LOCK_LEASE_MS` | `30000` | Lock expires this long after the last renewal. |
-| `LOCK_RENEW_MS` | — | `10000` | Client renewal interval; one third of the lease. |
-| `AI_CONTEXT_LIMIT` | — | `50` | Maximum log rows sent to the model. |
-| `AI_TIMEOUT_MS` | — | `20000` | Ollama request timeout. |
-| `OLLAMA_URL` | `OLLAMA_URL` | `http://127.0.0.1:11434` | Local inference server. |
-| `OLLAMA_MODEL` | `OLLAMA_MODEL` | `llama3.2:3b` | Model name; any pulled model works. |
-| `SESSION_COOKIE` | — | `atm_sid` | Session cookie name. |
-| `SESSION_GRACE_MS` | — | `60000` | A session with no connected socket is kept this long, then its name is free again. |
+| `PORT` | `PORT` | `3000` | HTTP and WebSocket port |
+| `HOST` | `HOST` | `0.0.0.0` | Bind every interface so phones can reach it |
+| `DB_PATH` | `DB_PATH` | `data/atm.db` | SQLite file; tests pass `:memory:` |
+| `INITIAL_BALANCE_CENTS` | `INITIAL_BALANCE_CENTS` | `100000` | $1,000.00, used once at database creation |
+| `MAX_DEPOSIT_CENTS` | — | `1000000` | $10,000.00 per deposit |
+| `MAX_AMOUNT_DIGITS` | — | `7` | Keypad buffer limit for amounts |
+| `MIN_NAME_LENGTH` | — | `3` | From the source spec |
+| `MAX_NAME_LENGTH` | — | `20` | UI buffer limit |
+| `MULTITAP_WINDOW_MS` | — | `800` | Press window for cycling letters on one key |
+| `LOCK_LEASE_MS` | `LOCK_LEASE_MS` | `30000` | Lock expires this long after the last renewal |
+| `LOCK_RENEW_MS` | — | `10000` | Client renewal interval (one third of the lease) |
+| `AI_CONTEXT_LIMIT` | — | `50` | Maximum log rows sent to the model |
+| `AI_TIMEOUT_MS` | — | `20000` | Ollama request timeout |
+| `OLLAMA_URL` | `OLLAMA_URL` | `http://127.0.0.1:11434` | Local inference server |
+| `OLLAMA_MODEL` | `OLLAMA_MODEL` | `llama3.2:3b` | Any pulled model works |
+| `SESSION_COOKIE` | — | `atm_sid` | Session cookie name |
+| `SESSION_GRACE_MS` | — | `60000` | A session with no connected socket is kept this long, then swept |
 
 ## 4. Money
 
-All money on the wire and in the database is an **integer number of cents**,
-named `...Cents`. No floats, ever.
+All money on the wire and in the database is an integer number of **cents**, named
+`...Cents`. No floats, ever.
 
 ```ts
 // src/server/money.ts
-export function formatAUD(cents: number): string;      // 100000 -> "$1,000.00"
-export function digitsToCents(digits: string): number; // "500" -> 50000 (whole dollars)
-export function isValidAmount(digits: string): boolean; // 1..MAX_AMOUNT_DIGITS digits, not "0"
+export function formatAUD(cents: number): string;       // 100000 -> "$1,000.00"
+export function digitsToCents(digits: string): number;  // "500" -> 50000 (whole dollars)
+export function isValidAmount(digits: string): boolean; // 1..7 digits, not "0"
 ```
 
 - `formatAUD` uses `Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" })`.
-- The keypad has no decimal point, so typed digits are **whole dollars**:
-  `"500"` means $500.00. The client sends `amountCents: 50000`.
-- The ATM shows the balance with cents (`$1,000.00`) always.
+- The keypad has no decimal point, so typed digits are whole dollars: `"500"` means
+  $500.00 and the client sends `amountCents: 50000`.
+- Balances always show cents (`$1,000.00`).
 
 ## 5. Time
 
@@ -147,15 +135,15 @@ export function isValidAmount(digits: string): boolean; // 1..MAX_AMOUNT_DIGITS 
 export interface LocalStamp {
   timestampMs: number;  // Date.now()
   localDate: string;    // "2026-11-15"
-  localTime: string;    // "12:30:45"
+  localTime: string;    // "12:30:45", 24-hour, zero padded
 }
 export function localStamp(now?: number): LocalStamp;
 export function formatLocalDateTime(timestampMs: number): string; // "2026-11-15 12:30:45"
 ```
 
-`localStamp` formats with `Intl.DateTimeFormat` and **no `timeZone` option**, so
-it uses the server's timezone. It is called once, when the event happens, and the
-two strings are stored on the row. Clients display the stored strings verbatim.
+`Intl.DateTimeFormat("en-AU", { hour12: false })` with **no `timeZone` option**, so the
+server's zone wins. It is called once, when the event happens; clients display the
+stored strings verbatim.
 
 ## 6. HTTP contract
 
@@ -163,25 +151,23 @@ Base path `/api`. JSON in, JSON out. The session cookie is the only credential.
 
 ### 6.1 Errors
 
-Non-2xx responses are always:
-
 ```json
 { "error": { "code": "INSUFFICIENT_FUNDS", "message": "That is more than the balance." } }
 ```
 
-`message` is written for a person and is shown in the ATM display unchanged.
+`message` is written for a person and shown in the ATM display unchanged.
 
 | HTTP | `code` | Raised when |
 |------|--------|-------------|
-| 400 | `INVALID_NAME` | Name shorter than 3, longer than 20, or not A–Z |
-| 400 | `INVALID_AMOUNT` | Amount not 1–7 digits, zero, or not a whole number of dollars |
+| 400 | `INVALID_NAME` | Not `^[A-Z]{3,20}$` after trim |
+| 400 | `INVALID_AMOUNT` | Not 1–7 digits, zero, or not a whole number of dollars |
 | 400 | `INSUFFICIENT_FUNDS` | Withdrawal greater than the balance |
 | 400 | `AMOUNT_TOO_LARGE` | Deposit greater than `MAX_DEPOSIT_CENTS` |
-| 401 | `NOT_AUTHENTICATED` | No valid session cookie |
 | 400 | `INVALID_QUESTION` | Assistant message empty or longer than 500 characters |
-| 409 | `NAME_TAKEN` | Another logged-in session already uses that name |
+| 401 | `NOT_AUTHENTICATED` | No valid session cookie |
+| 409 | `NAME_TAKEN` | Another live session holds that name right now |
 | 409 | `LOCK_NOT_HELD` | Deposit/withdraw without holding the lock |
-| 409 | `LOCK_LOST` | Lock renewal by a session that no longer owns it |
+| 409 | `LOCK_LOST` | Renewal by a session that no longer owns the lock |
 | 423 | `ACCOUNT_LOCKED` | Lock requested while another session owns it |
 | 503 | `ASSISTANT_UNAVAILABLE` | Ollama unreachable or timed out |
 | 500 | `INTERNAL` | Anything unexpected; details are logged, not returned |
@@ -212,8 +198,8 @@ type LockState = {
 };
 ```
 
-`message` is built by the server from the event type and amount, so the ATM, the
-log API and the AI all show identical wording:
+`message` is rendered by the server so the ATM, `GET /api/activity` and the AI all
+show identical wording:
 
 | `eventType` | `message` |
 |-------------|-----------|
@@ -233,7 +219,7 @@ All except `GET /api/health`, `POST /api/session` and
 | Method | Path | Request | Success |
 |--------|------|---------|---------|
 | GET | `/api/health` | — | `200 { "ok": true }` |
-| POST | `/api/session` | `{ "name": "USER1" }` | `201 { "session": { "userName": "USER1" } }` + `Set-Cookie`; `200` when this browser already holds that name; `409 NAME_TAKEN` when another session does |
+| POST | `/api/session` | `{ "name": "USER1" }` | `201` when the name is new to the database, `200` when it already exists; both `{ "session": { "userName": "USER1" } }` + `Set-Cookie`; `409 NAME_TAKEN` while another live session holds it |
 | GET | `/api/session/availability` | `?name=USER1` | `200 { "available": boolean }` |
 | GET | `/api/session` | — | `200 { "session": { "userName": "USER1" } }` |
 | DELETE | `/api/session` | — | `204`, cookie cleared, `logout` entry |
@@ -241,43 +227,39 @@ All except `GET /api/health`, `POST /api/session` and
 | GET | `/api/lock` | — | `200 { "lock": LockState }` |
 | POST | `/api/lock` | — | `201 { "lock": LockState }`; `200` when the caller already owns it; `423 ACCOUNT_LOCKED` otherwise |
 | POST | `/api/lock/renew` | — | `200 { "lock": LockState }` or `409 LOCK_LOST` |
-| DELETE | `/api/lock` | `?cancelled=withdraw\|deposit` (optional) | `204`; idempotent; records `transaction_cancelled` when a lock was held |
+| DELETE | `/api/lock` | `?cancelled=withdraw\|deposit` (optional) | `204`, idempotent; records `transaction_cancelled` when a lock was held |
 | POST | `/api/transactions/withdraw` | `{ "amountCents": 50000 }` | `200 { "account": Account }` |
 | POST | `/api/transactions/deposit` | `{ "amountCents": 50000 }` | `200 { "account": Account }` |
 | GET | `/api/activity` | `?limit=50&eventType=&userName=&fromMs=&toMs=` | `200 { "entries": ActivityEntry[] }` |
 | POST | `/api/assistant/chat` | `{ "message": "Who withdrew $5,000?" }` | `200 { "reply": string, "evidence": ActivityEntry[] }` |
 
-Notes that hold for every endpoint:
+Rules that hold for every endpoint:
 
-- A failed deposit/withdraw still releases the lock and writes a
-  `*_failed` entry before responding (see slice 07).
-- `GET /api/activity` returns entries **oldest first**, default `limit=50`,
-  maximum `200`.
-- `POST /api/assistant/chat` returns at most `AI_CONTEXT_LIMIT` (50) entries in
-  `evidence`, oldest first: exactly the rows given to the model.
-- Amounts arrive as `amountCents`; the server rejects anything that is not a
-  positive integer.
-- **Names are unique among live sessions.** `POST /api/session` refuses a name held
-  by another session with `409 NAME_TAKEN`. A name becomes free again when its
-  session ends: sign-out, or `SESSION_GRACE_MS` after that session's last socket
-  disconnects. The availability endpoint is the login screen's early warning; the
-  `POST` check is the authority, and it is a synchronous check-then-create so two
-  simultaneous logins cannot both win.
+- A failed deposit/withdraw still releases the lock and writes a `*_failed` entry
+  before responding (07).
+- `GET /api/activity` returns entries **oldest first**, default `limit=50`, maximum
+  `200`.
+- `POST /api/assistant/chat` returns at most `AI_CONTEXT_LIMIT` entries in `evidence`,
+  oldest first: exactly the rows given to the model.
+- Amounts arrive as `amountCents`; anything that is not a positive integer is rejected.
+- **The name is the identity and it is unique in the database.** Every name ever used has
+  one row in `user_names`, created at the first login and reused on every later login:
+  `SIMON` today and `SIMON` next week are the same actor in the log. Signing out frees
+  the name for reuse, never for duplication.
+- **Only one session may hold a name at a time.** `POST /api/session` refuses a name held
+  by another live session with `409 NAME_TAKEN`; the check and the session creation are
+  one synchronous stretch, so two simultaneous logins cannot both win.
+  `GET /api/session/availability` is the login screen's early warning; the `POST` check
+  is the authority.
 
 ## 7. WebSocket contract
 
-Socket.IO on the same HTTP server, so the browser connects to the page's own
-origin. The session cookie is sent with the handshake; the server resolves it to
-a session (or none) and keeps `socket.data.sessionId` / `socket.data.userName`.
-
-The server also counts sockets per session with `setSessionSockets`. That count is
-what makes a name unique: when the last socket of a session disconnects, the
-session starts its `SESSION_GRACE_MS` countdown, and after that its name can be
-used again. A browser that is still making requests never loses its name.
-
-The server broadcasts to **all** connected sockets. A socket that is not logged in
-ignores the events; it is still sent them so that a freshly loaded page already
-has the latest state.
+Socket.IO on the same HTTP server, so the browser connects to the page's own origin.
+The session cookie travels with the handshake; the server resolves it and stores
+`socket.data.sessionId` / `socket.data.userName` (both `null` when absent). It also
+counts sockets per session; when the last one disconnects the session is swept
+`SESSION_GRACE_MS` later, which releases any lock it held and frees the name for another
+session. The name's row in `user_names` stays (§8).
 
 | Event | Direction | Payload |
 |-------|-----------|---------|
@@ -285,16 +267,19 @@ has the latest state.
 | `lock:updated` | server → client | `{ lock: LockState }` |
 | `activity:created` | server → client | `{ entry: ActivityEntry }` |
 
+- Every event carries the full current value, never a delta.
 - Sent after the database write has committed, never before.
-- `connect` on the client is followed by `GET /api/account` and `GET /api/lock`,
-  so a reconnect repairs anything missed while offline.
-- Clients send no WebSocket messages. All commands are HTTP.
+- Broadcast to **all** sockets. A socket that is not logged in ignores the events; it
+  still receives them so a freshly loaded page has current state.
+- On `connect` the client calls `GET /api/account` and `GET /api/lock`, so a reconnect
+  repairs anything missed while offline.
+- Clients send no socket messages. All commands are HTTP.
 
 ## 8. Database
 
 One file. `db.ts` opens it, sets `PRAGMA journal_mode = WAL` and
-`PRAGMA foreign_keys = ON`, then applies `SCHEMA_SQL` (idempotent, `IF NOT EXISTS`)
-and seeds the account when it is absent.
+`PRAGMA foreign_keys = ON`, applies `SCHEMA_SQL` (idempotent), sets
+`PRAGMA user_version = 1`, and seeds the account when it is absent.
 
 ```sql
 CREATE TABLE IF NOT EXISTS account (
@@ -318,42 +303,54 @@ CREATE TABLE IF NOT EXISTS activity_log (
 );
 
 CREATE INDEX IF NOT EXISTS activity_log_timestamp_idx ON activity_log (timestamp_ms);
+
+CREATE TABLE IF NOT EXISTS user_names (
+  name       TEXT PRIMARY KEY,
+  used_at_ms INTEGER NOT NULL
+);
 ```
 
-Rules:
-
-- `account.id` is always `1`. There is exactly one balance.
-- `balance_cents` may never be negative; the `CHECK` is the last line of defence
-  behind the application rule.
+- `account.id` is always `1`; there is exactly one balance. The `CHECK` is the last
+  line of defence behind the application rule.
 - `amount_cents` and `balance_after_cents` are `NULL` for `login` and `logout`.
-- `reason` is one of `insufficient_funds`, `amount_too_large`, `invalid_amount`,
+- `reason` is `insufficient_funds`, `amount_too_large`, `invalid_amount`,
   `lock_conflict`, `cancelled`, or `NULL`.
-- Indexes are declared in the schema string, not created ad hoc.
+- `user_names` has one row per name ever used, written at the first login and reused
+  afterwards. The primary key keeps names unique as strings, so a name in the log always
+  means the same label; it is a registry of names, not an account table. The application
+  never deletes from it.
+- Indexes live in the schema string, never created ad hoc.
 
-**Sessions, lock state and the AI chat are in memory only.** They describe who is
-connected *now*; they are meaningless after a restart, and persisting them would
-create stale locks. The balance and the log are the state that must survive, and
-they live in SQLite.
+**Sessions, lock state and AI chat are in memory only.** They describe who is
+connected now; persisting a lock would resurrect a stale one after a restart. Balance,
+log and used names are the state that must survive, and they live in SQLite.
 
 ## 9. Module contracts
 
-Signatures the later slices depend on. Bodies belong to the slices.
+Signatures later slices depend on. Bodies belong to the slices.
 
 ```ts
 // db.ts
 export function openDatabase(path: string): Database.Database; // migrates + seeds
 
-// account.ts   (`db` is passed in, so tests never share a handle)
+// account.ts   (db is passed in, so tests never share a handle)
 export function getAccount(db: Database.Database): Account;
 export function withdraw(db: Database.Database, userName: string, amountCents: number): TxResult;
 export function deposit(db: Database.Database, userName: string, amountCents: number): TxResult;
 
 // activity.ts
+export interface RecordEventInput {
+  eventType: ActivityEntry["eventType"];
+  userName: string;
+  amountCents?: number | null;
+  balanceAfterCents?: number | null;
+  reason?: string | null;
+}
 export function recordEvent(db: Database.Database, input: RecordEventInput): ActivityEntry;
 export function listEntries(db: Database.Database, filter?: EntryFilter): ActivityEntry[];
 export function toPublicEntry(row: ActivityRow): ActivityEntry; // builds `message`
 
-// sessions.ts   (slices 04 and 05)
+// sessions.ts (behaviour: 04 §2)
 export interface Session {
   id: string; userName: string; createdAtMs: number; lastSeenMs: number;
   sockets: number;               // connected sockets, maintained by realtime.ts
@@ -361,17 +358,20 @@ export interface Session {
 }
 export function createSession(userName: string, nowMs?: number): Session;
 export function getSession(id: string | null, nowMs?: number): Session | null;
-export function findSessionByName(userName: string, nowMs?: number): Session | null;
-export function isNameTaken(userName: string, nowMs?: number): boolean;
+export function findSessionByName(userName: string, nowMs?: number): Session | null; // live sessions only
 export function setSessionSockets(id: string, count: number, nowMs?: number): void;
 export function destroySession(id: string): void;
 export function readSessionId(cookieHeader: string | undefined): string | null;
 export function sweepSessions(nowMs: number): Session[]; // returns the destroyed ones
 
-// lock.ts  (slice 07)
+// names.ts (behaviour: 04 §2)
+export function ensureName(db: Database.Database, name: string, nowMs?: number): boolean; // true when the name was new
+
+// lock.ts (behaviour: 07 §2)
 export function acquire(sessionId: string, userName: string, nowMs?: number): LockInfo;
 export function renew(sessionId: string, nowMs?: number): LockInfo;
 export function release(sessionId: string, opts?: { reason?: "cancelled" | "disconnect" | "done" }): boolean;
+export function releaseAllForSession(sessionId: string): boolean;
 export function isLockOwner(sessionId: string | null): boolean;
 export function getLock(): LockInfo | null;
 export function getLockState(sessionId: string | null): LockState;
@@ -382,43 +382,36 @@ export function resetLock(): void; // tests only
 export function attachRealtime(server: http.Server, deps: { db: Database }): io.Server;
 export function broadcastAccount(account: Account): void;
 export function broadcastActivity(entry: ActivityEntry): void;
-export function broadcastLockState(): void;                // per-socket isMine, slice 05
+export function broadcastLockState(): void; // recomputed per socket, no argument
 export function getIo(): io.Server | null;
 ```
 
-`TxResult` is defined by slice 06: `{ ok: true; account: Account; entry: ActivityEntry }`
-or `{ ok: false; code: string; message: string; entry: ActivityEntry }`. Both branches
-carry the entry the transaction wrote, so the caller can broadcast it without
-re-reading the log.
+`TxResult` (06 §2) is `{ ok: true; account: Account; entry: ActivityEntry }` or
+`{ ok: false; code: string; message: string; entry: ActivityEntry }`. Both branches
+carry the entry the transaction wrote, so the caller broadcasts it without re-reading
+the log.
 
 `LockInfo` is the stored record (`ownerSessionId`, `ownerName`, `acquiredAtMs`,
 `expiresAtMs`); `LockState` is what `GET /api/lock` and the sockets send.
 
-Lock state is the only thing the server sends differently per socket: each socket
-receives `{ lock: getLockState(socket.data.sessionId) }`. Names are unique among
-live sessions, so `ownerName` would almost do, but `isMine` comes from the session
-id — the same key the lock is actually held by — so a later change to the naming
-rule cannot silently mislead a client. Every other event is identical for everyone.
-Slice 05 owns the implementation.
+`lock:updated` is the only per-socket payload: each socket gets
+`getLockState(socket.data.sessionId)`, because `isMine` comes from the session id —
+the key the lock is actually held by — not from comparing `ownerName`. Every other
+event is identical for everyone.
 
 ## 10. Conventions
 
-- Server code is CommonJS (`tsconfig.json`, `module: "commonjs"`, `outDir: "dist"`).
-  Client code is browser-native ES modules (`tsconfig.client.json`,
-  `module: "ESNext"`, `moduleResolution: "bundler"`, `outDir: "public/js"`,
-  `lib: ["ES2022", "DOM"]`). Both configs set `rootDir: "src"` and include
-  `src/shared`, which is why the server entry is `dist/server/index.js` and the
-  browser entry is `/js/client/main.js`.
-- `src/shared/types.ts` holds the types both sides use (`Account`, `ActivityEntry`,
-  `LockState`, `Session`) and nothing else. It has no runtime behaviour; import it
-  with `import type`, so nothing is loaded over the wire.
-- Client code imports shared types as `import type { Account } from "../shared/types.js"`.
-  The `.js` extension is required by native ES modules and is erased by `import type`.
-- Files export named functions. No classes except `ApiError` and the Socket.IO
-  server.
-- `ApiError` carries `status` and `code`; the error middleware turns it into
-  §6.1 and logs anything else at 500.
+- Server: CommonJS (`tsconfig.json`, `module: "commonjs"`, `outDir: "dist"`). Client:
+  native ES modules (`tsconfig.client.json`, `module: "ESNext"`,
+  `moduleResolution: "bundler"`, `lib: ["ES2022", "DOM"]`, `outDir: "public/js"`).
+  Both set `rootDir: "src"` and include `src/shared`, so the entries are
+  `dist/server/index.js` and `/js/client/main.js`.
+- `src/shared/types.ts` holds only the types both sides use, no runtime behaviour.
+- Files export named functions. No classes except `ApiError` and the Socket.IO server.
+- `ApiError` carries `status` and `code`; the error middleware turns it into §6.1 and
+  logs anything else at 500.
 - No `console.log` in request paths other than the startup banner and errors.
 - Every mutating request is wrapped in one `db.transaction(...)`.
-- Test files sit next to the concern they test and use a fresh `:memory:`
-  database via `openDatabase(":memory:")`.
+- No `any`, no `@ts-ignore` in `src/`.
+- A test file sits next to the concern it tests and uses a fresh `:memory:` database
+  via `openDatabase(":memory:")`.

@@ -67,9 +67,10 @@ Copied from the source spec and from `AGENTS.md`. They apply to every slice.
   the problem.
 - **One shared account.** There is no per-user balance anywhere in the system.
 - **Uppercase A–Z only** for names; names are at least 3 characters.
-- **Login names are unique in the database.** A second person who picks the same name
-  is stopped on the login page, and the server is what stops them. Once a user
-  logs in with a certain name, no user can use that name as long as its in the database.
+- **Login names are unique in the database.** A name is stored once and 
+  reused whenever someone logs in with it, so SIMON today and SIMON tomorrow are the same person 
+  in the activity log. Once a login name has been used, a second client that picks 
+  it is stopped on the login page by the server.
 
 ## 4. Terms
 
