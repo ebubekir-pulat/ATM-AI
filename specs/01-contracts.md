@@ -165,7 +165,7 @@ Base path `/api`. JSON in, JSON out. The session cookie is the only credential.
 | 400 | `AMOUNT_TOO_LARGE` | Deposit greater than `MAX_DEPOSIT_CENTS` |
 | 400 | `INVALID_QUESTION` | Assistant message empty or longer than 500 characters |
 | 401 | `NOT_AUTHENTICATED` | No valid session cookie |
-| 409 | `NAME_TAKEN` | Another live session holds that name right now |
+| 409 | `NAME_TAKEN` | Another user has already taken that name |
 | 409 | `LOCK_NOT_HELD` | Deposit/withdraw without holding the lock |
 | 409 | `LOCK_LOST` | Renewal by a session that no longer owns the lock |
 | 423 | `ACCOUNT_LOCKED` | Lock requested while another session owns it |
