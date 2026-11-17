@@ -948,7 +948,7 @@ Expected: FAIL — `errorHandler`, `createApp` and the public files do not exist
 
 Append to `src/server/http/errors.ts`:
 
-- `errorHandler(err: unknown, req, res, next)` — four parameters so Express recognises it as an error handler, even though `next` is unused. `ApiError` → `res.status(err.status).json({ error: { code: err.code, message: err.message } })`. Anything else → `console.error(err)` (the stack) and `res.status(500).json({ error: { code: "INTERNAL", message: "Something went wrong." } })`.
+- `errorHandler(err: unknown, req, res, next)` — four parameters so Express recognises it as an error handler, even though `next` is unused. `ApiError` → `res.status(err.status).json({ error: { code: err.code, message } })` where `message` is `err.message` for 4xx codes and `"Something went wrong."` for a 500 `ApiError` (500 details are logged, not returned, per `01` §6.1). Anything else → `console.error(err)` (the stack) and `res.status(500).json({ error: { code: "INTERNAL", message: "Something went wrong." } })`.
 - `notFoundHandler(req, res)` — `res.status(404).json({ error: { code: "NOT_FOUND", message: "Not found." } })`.
 
 - [ ] **Step 6: Write the route, app and entry point**
