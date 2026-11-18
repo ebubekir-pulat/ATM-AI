@@ -125,10 +125,6 @@ export function createKeypad(onKey: (key: Key) => void): HTMLElement;
   `Delete last character`, `Enter and confirm`).
 - One key press produces exactly one `onKey` call: `pointerdown` for feedback, `click`
   for the action.
-- A physical keyboard works too: digits map to themselves, `Backspace` → `back`,
-  `Delete`/`Escape` → `clear`, `Enter` → `enter`. Keys are ignored while `busy` and
-  while focus is in a text field (the AI chat box), so typing a question never
-  operates the ATM.
 
 ## 5. Multi-tap
 
@@ -213,10 +209,9 @@ markup, so `main.ts` may assume the elements exist.
       times quickly wraps back to `P`.
 - [ ] CLEAR empties the entry; BACK removes one character; ENTER with `AB` shows
       `Name must be at least 3 letters.` and stays on login.
-- [ ] ENTER with `ABC` goes home and the title reads `WELCOME, ABC`.
+- [ ] ENTER with `ABC` goes to home and the title reads `WELCOME, ABC`.
 - [ ] BACK on the amount screen deletes a digit, and on an empty entry returns home.
 - [ ] On a 375 px viewport the ATM fits without horizontal scrolling and every key is
       thumb-reachable.
-- [ ] The physical keyboard drives the same actions, and typing in a text field does
-      not operate the ATM.
+- [ ] Typing in a text field does not operate the ATM. ATM should never be operated by a keyboard
 - [ ] `npm test` passes; no console errors in the browser.
