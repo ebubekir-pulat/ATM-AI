@@ -6,7 +6,7 @@
 
 **Architecture:** Single state object with pure reducer, screens as pure view-model functions, display/keypad/multitap as separate UI modules. One render loop driven by 200ms interval for multi-tap resolution. No network calls in this slice.
 
-**Tech Stack:** TypeScript (dual tsconfig: client + server), vanilla DOM, Jest for tests, Vite or similar for dev server (npm start).
+**Tech Stack:** TypeScript (dual tsconfig: client + server), vanilla DOM, Vitest for tests (matches server), plain ES modules served by Express (no bundler per spec §1).
 
 **Spec:** `specs/03-atm-shell-and-keypad.md`
 
@@ -18,7 +18,7 @@
 - Colour never sole cue: `aria-label` on every key (`Clear entry`, `Delete last character`, `Enter and confirm`).
 - Page white background, ATM centred, `min-height: 100dvh`.
 - No animation > `150ms`; nothing moves while transaction in flight.
-- `npm run build` emits to `public/js/client/`; entry is `/js/client/main.js`.
+- `npm run build` emits to `public/js/` (client code under `public/js/client/`); entry is `/js/client/main.js`.
 - `npm test` passes; no console errors in browser.
 - Screens never touch DOM; they return `ViewModel`, `display.ts` paints it.
 - Balance formatted client-side with `Intl` for display only; value always from server.
@@ -36,7 +36,7 @@
 ### Task 1: Project Setup & TypeScript Config
 
 **Files:**
-- Create: `tsconfig.client.json`
+- Create: `tsconfig.client.json`, `.gitignore`
 - Modify: `package.json`
 
 **Interfaces:**
@@ -45,23 +45,21 @@
 - [ ] **Step 1: Write `tsconfig.client.json`**
 ```json
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "public/js/client",
-    "rootDir": "src/client",
+    "outDir": "public/js",
+    "rootDir": "src",
     "module": "ESNext",
     "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "moduleResolution": "bundler",
-    "jsx": "react-jsx",
     "strict": true,
     "noEmit": false,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["src/client/**/*"],
-  "exclude": ["node_modules", "public", "tests"]
+  "include": ["src/client/**/*", "src/shared/**/*"],
+  "exclude": ["node_modules", "public", "tests", "dist"]
 }
 ```
 
@@ -70,26 +68,33 @@
 {
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.client.json",
-    "test": "jest",
-    "start": "vite"
+    "start": "node dist/server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
-    "vite": "^5.0.0",
-    "jest": "^29.0.0",
-    "ts-jest": "^29.0.0",
-    "@types/jest": "^29.0.0"
+    "vitest": "^1.6.0",
+    "@types/node": "^20.0.0"
   }
 }
 ```
 
-- [ ] **Step 3: Run build to verify config**
-Run: `npm run build`
-Expected: No errors, emits to `public/js/client/`
+- [ ] **Step 3: Write `.gitignore`**
+```
+node_modules/
+dist/
+data/
+public/js/
+```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Run build to verify config**
+Run: `npm run build`
+Expected: No errors, emits server to `dist/` and client to `public/js/`
+
+- [ ] **Step 5: Commit**
 ```bash
-git add tsconfig.client.json package.json
-git commit -m "chore: add client tsconfig and build scripts"
+git add tsconfig.client.json .gitignore package.json
+git commit -m "chore: add client tsconfig, gitignore and build scripts"
 ```
 
 ---
@@ -325,7 +330,7 @@ Expected: FAIL - module not found
 - [ ] **Step 3: Implement `src/client/ui/multitap.ts`**
 ```ts
 // src/client/ui/multitap.ts
-import { MultiTapState, MULTITAP_WINDOW_MS, MAX_NAME_LENGTH } from '../state';
+import { MultiTapState, MULTITAP_WINDOW_MS, MAX_NAME_LENGTH } from '../state.js';
 
 const KEY_MAP: Record<string, string> = {
   '2': 'ABC', '3': 'DEF', '4': 'GHI', '5': 'JKL',
@@ -605,7 +610,7 @@ Expected: FAIL - module not found
 - [ ] **Step 3: Implement `src/client/ui/keypad.ts`**
 ```ts
 // src/client/ui/keypad.ts
-import { Key } from '../state';
+import { Key } from '../state.js';
 
 const KEY_CONFIG: Array<{ key: Key; label: string; color: string; ariaLabel: string }> = [
   { key: '1', label: '1', color: '#d8dde3', ariaLabel: 'Digit 1' },
@@ -783,9 +788,9 @@ Expected: FAIL - module not found
 - [ ] **Step 3: Implement screen files**
 ```ts
 // src/client/screens/login.ts
-import { AppState } from '../state';
-import { ViewModel } from '../ui/display';
-import { shownText } from '../ui/multitap';
+import { AppState } from '../state.js';
+import { ViewModel } from '../ui/display.js';
+import { shownText } from '../ui/multitap.js';
 
 export function loginView(state: AppState): ViewModel {
   return {
@@ -800,9 +805,9 @@ export function loginView(state: AppState): ViewModel {
 
 ```ts
 // src/client/screens/home.ts
-import { AppState } from '../state';
-import { ViewModel } from '../ui/display';
-import { formatCents } from '../ui/money';
+import { AppState } from '../state.js';
+import { ViewModel } from '../ui/display.js';
+import { formatCents } from '../ui/money.js';
 
 export function homeView(state: AppState): ViewModel {
   return {
@@ -814,9 +819,9 @@ export function homeView(state: AppState): ViewModel {
 
 ```ts
 // src/client/screens/amount.ts
-import { AppState } from '../state';
-import { ViewModel } from '../ui/display';
-import { formatCents } from '../ui/money';
+import { AppState } from '../state.js';
+import { ViewModel } from '../ui/display.js';
+import { formatCents } from '../ui/money.js';
 
 export function amountView(state: AppState): ViewModel {
   const title = state.amountMode === 'deposit' ? 'DEPOSIT' : 'WITHDRAWAL';
@@ -830,8 +835,8 @@ export function amountView(state: AppState): ViewModel {
 
 ```ts
 // src/client/screens/message.ts
-import { AppState } from '../state';
-import { ViewModel } from '../ui/display';
+import { AppState } from '../state.js';
+import { ViewModel } from '../ui/display.js';
 
 export function messageView(state: AppState): ViewModel {
   return {
@@ -843,10 +848,10 @@ export function messageView(state: AppState): ViewModel {
 
 ```ts
 // src/client/screens/index.ts
-export * from './login';
-export * from './home';
-export * from './amount';
-export * from './message';
+export * from './login.js';
+export * from './home.js';
+export * from './amount.js';
+export * from './message.js';
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1019,8 +1024,8 @@ Expected: FAIL - reducer not implemented
 ```ts
 // In src/client/state.ts, replace the stub reduce function:
 
-import { press, resolve, backspace, clearAll, shownText } from './ui/multitap';
-import { formatCents } from './ui/money';
+import { press, resolve, backspace, clearAll, shownText } from './ui/multitap.js';
+import { formatCents } from './ui/money.js';
 
 export function reduce(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -1255,14 +1260,14 @@ html, body {
 - [ ] **Step 3: Create `src/client/main.ts`**
 ```ts
 // src/client/main.ts
-import { createInitialState, reduce, AppState } from './state';
-import { renderDisplay, ViewModel } from './ui/display';
-import { createKeypad } from './ui/keypad';
-import { loginView } from './screens/login';
-import { homeView } from './screens/home';
-import { amountView } from './screens/amount';
-import { messageView } from './screens/message';
-import { resolve } from './ui/multitap';
+import { createInitialState, reduce, AppState } from './state.js';
+import { renderDisplay, ViewModel } from './ui/display.js';
+import { createKeypad } from './ui/keypad.js';
+import { loginView } from './screens/login.js';
+import { homeView } from './screens/home.js';
+import { amountView } from './screens/amount.js';
+import { messageView } from './screens/message.js';
+import { resolve } from './ui/multitap.js';
 
 const app = document.getElementById('app')!;
 const displayRoot = document.createElement('div');
@@ -1314,7 +1319,7 @@ Run: `npm run build`
 Expected: Emits `public/js/client/main.js` and deps
 
 Run: `npm start`
-Expected: Vite serves `public/index.html`, ATM renders per spec §1
+Expected: Express serves `public/index.html`, ATM renders per spec §1
 
 - [ ] **Step 5: Commit**
 ```bash
