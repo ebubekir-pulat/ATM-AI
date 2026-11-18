@@ -103,3 +103,36 @@ test("shownText includes caret underscore", () => {
   s = { text: "US", pendingKey: "2", pendingIndex: 0, pendingAtMs: 1000 };
   expect(shownText(s)).toBe("USA_");
 });
+
+test("same-key in-window tap still advances pending at the max length boundary", () => {
+  const committed = "A".repeat(MAX_NAME_LENGTH - 1);
+  let s = { text: committed, pendingKey: "2", pendingIndex: 0, pendingAtMs: 1000 };
+  expect(shownText(s)).toBe(committed + "A_");
+
+  s = press(s, "2", 1000 + 100);
+  expect(shownText(s)).toBe(committed + "B_");
+  expect(s.text).toBe(committed);
+  expect(s.pendingKey).toBe("2");
+  expect(s.pendingIndex).toBe(1);
+});
+
+test("cross-key press at the boundary commits pending without starting a new one", () => {
+  const committed = "A".repeat(MAX_NAME_LENGTH - 1);
+  let s = { text: committed, pendingKey: "2", pendingIndex: 0, pendingAtMs: 1000 };
+
+  s = press(s, "3", 1000 + 100);
+  expect(s.text).toBe(committed + "A");
+  expect(s.text.length).toBe(MAX_NAME_LENGTH);
+  expect(s.pendingKey).toBeNull();
+  expect(shownText(s)).toBe(committed + "A_");
+});
+
+test("same key after window at the boundary commits pending without starting a new one", () => {
+  const committed = "A".repeat(MAX_NAME_LENGTH - 1);
+  let s = { text: committed, pendingKey: "2", pendingIndex: 0, pendingAtMs: 1000 };
+
+  s = press(s, "2", 1000 + MULTITAP_WINDOW_MS + 1);
+  expect(s.text).toBe(committed + "A");
+  expect(s.text.length).toBe(MAX_NAME_LENGTH);
+  expect(s.pendingKey).toBeNull();
+});

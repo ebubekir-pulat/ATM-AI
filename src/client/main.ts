@@ -26,16 +26,16 @@ hint.className = "atm__hint";
 hint.textContent = "Your name is used only in the log.";
 app.appendChild(hint);
 
-function getViewModel(state: AppState): ViewModel {
-  switch (state.screen) {
+function getViewModel(appState: AppState): ViewModel {
+  switch (appState.screen) {
     case "login":
-      return loginView(state);
+      return loginView(appState);
     case "home":
-      return homeView(state);
+      return homeView(appState);
     case "amount":
-      return amountView(state);
+      return amountView(appState);
     case "message":
-      return messageView(state);
+      return messageView(appState);
   }
 }
 

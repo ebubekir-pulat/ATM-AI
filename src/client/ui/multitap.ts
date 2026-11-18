@@ -23,19 +23,21 @@ export function createMultiTap(): MultiTapState {
 
 export function press(state: MultiTapState, key: string, nowMs: number): MultiTapState {
   const letters = KEY_MAP[key];
-  if (!letters || state.text.length + (state.pendingKey ? 1 : 0) >= MAX_NAME_LENGTH) {
-    return state;
-  }
+  if (!letters) return state;
 
-  if (
+  const isAdvance =
     state.pendingKey === key &&
     state.pendingAtMs !== null &&
-    nowMs - state.pendingAtMs < MULTITAP_WINDOW_MS
-  ) {
+    nowMs - state.pendingAtMs < MULTITAP_WINDOW_MS;
+
+  // Advancing the pending letter does not commit, so the length cap does not apply.
+  if (isAdvance) {
     const nextIndex = (state.pendingIndex + 1) % letters.length;
     return { ...state, pendingIndex: nextIndex, pendingAtMs: nowMs };
   }
 
+  // A new cycle commits any pending letter first, then starts a new pending
+  // only while committed + pending stays within MAX_NAME_LENGTH.
   let newText = state.text;
   if (state.pendingKey) {
     const previousLetters = KEY_MAP[state.pendingKey];
@@ -43,6 +45,11 @@ export function press(state: MultiTapState, key: string, nowMs: number): MultiTa
       newText += previousLetters[state.pendingIndex];
     }
   }
+
+  if (newText.length >= MAX_NAME_LENGTH) {
+    return { text: newText, pendingKey: null, pendingIndex: 0, pendingAtMs: null };
+  }
+
   return { text: newText, pendingKey: key, pendingIndex: 0, pendingAtMs: nowMs };
 }
 
