@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "outDir": "public/js",
+    "rootDir": "src",
+    "module": "ESNext",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": ["src/client/**/*", "src/shared/**/*"],
+  "exclude": ["node_modules", "public", "tests", "dist"]
+}
