@@ -8,7 +8,9 @@ test("initial state is login screen with empty input", () => {
   expect(state.userName).toBeNull();
 });
 
-test("reduce is a skeleton that returns the same state", () => {
+test("screen action moves to the requested screen without mutating the original", () => {
   const state = createInitialState();
-  expect(reduce(state, { type: "screen", to: "home" })).toBe(state);
+  const next = reduce(state, { type: "screen", to: "home" });
+  expect(next.screen).toBe("home");
+  expect(state.screen).toBe("login");
 });

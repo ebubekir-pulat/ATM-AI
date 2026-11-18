@@ -1,3 +1,5 @@
+import { backspace, clearAll, press, resolve, shownText } from "./ui/multitap.js";
+
 export type ScreenName = "login" | "home" | "amount" | "message";
 export type Connection = "connected" | "connecting" | "offline";
 
@@ -81,6 +83,59 @@ export function createInitialState(): AppState {
 }
 
 export function reduce(state: AppState, action: Action): AppState {
-  // TODO: implement transitions in a later task
+  switch (action.type) {
+    case "screen":
+      return { ...state, screen: action.to };
+
+    case "login":
+      return { ...state, userName: action.userName, screen: "home", banner: null };
+
+    case "key": {
+      const now = Date.now();
+      const input = resolve(state.input, now);
+
+      if (state.screen === "login") {
+        if (action.key >= "0" && action.key <= "9") {
+          return { ...state, input: press(input, action.key, now), banner: null };
+        }
+        switch (action.key) {
+          case "clear":
+            return { ...state, input: clearAll(), banner: null };
+          case "back":
+            return { ...state, input: backspace(input), banner: null };
+          case "enter": {
+            const name = shownText(input).replace(/_$/, "");
+            if (name.length < 3) {
+              return { ...state, banner: "Name must be at least 3 letters." };
+            }
+            return {
+              ...state,
+              screen: "home",
+              userName: name,
+              input: clearAll(),
+              banner: null,
+            };
+          }
+        }
+      }
+
+      if (state.screen === "amount") {
+        if (action.key >= "0" && action.key <= "9") {
+          return { ...state, amountDigits: state.amountDigits + action.key };
+        }
+        switch (action.key) {
+          case "clear":
+            return { ...state, amountDigits: "" };
+          case "back":
+            if (state.amountDigits.length > 0) {
+              return { ...state, amountDigits: state.amountDigits.slice(0, -1) };
+            }
+            return { ...state, screen: "home", amountMode: null, amountDigits: "" };
+        }
+      }
+
+      return { ...state, input };
+    }
+  }
   return state;
 }
