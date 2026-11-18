@@ -106,7 +106,7 @@ export function reduce(state: AppState, action: Action): AppState {
           case "enter": {
             const name = shownText(input).replace(/_$/, "");
             if (name.length < 3) {
-              return { ...state, banner: "Name must be at least 3 letters." };
+              return { ...state, input, banner: "Name must be at least 3 letters." };
             }
             return {
               ...state,
@@ -121,16 +121,16 @@ export function reduce(state: AppState, action: Action): AppState {
 
       if (state.screen === "amount") {
         if (action.key >= "0" && action.key <= "9") {
-          return { ...state, amountDigits: state.amountDigits + action.key };
+          return { ...state, input, amountDigits: state.amountDigits + action.key };
         }
         switch (action.key) {
           case "clear":
-            return { ...state, amountDigits: "" };
+            return { ...state, input, amountDigits: "" };
           case "back":
             if (state.amountDigits.length > 0) {
-              return { ...state, amountDigits: state.amountDigits.slice(0, -1) };
+              return { ...state, input, amountDigits: state.amountDigits.slice(0, -1) };
             }
-            return { ...state, screen: "home", amountMode: null, amountDigits: "" };
+            return { ...state, input, screen: "home", amountMode: null, amountDigits: "" };
         }
       }
 

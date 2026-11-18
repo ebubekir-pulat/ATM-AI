@@ -1,6 +1,5 @@
 import { expect, test } from "vitest";
-import { AppState, createInitialState, reduce } from "../../src/client/state";
-import { createMultiTap } from "../../src/client/ui/multitap";
+import { AppState, createInitialState, MULTITAP_WINDOW_MS, reduce } from "../../src/client/state";
 
 function loginState(overrides: Partial<AppState> = {}): AppState {
   return { ...createInitialState(), screen: "login", ...overrides };
@@ -57,6 +56,21 @@ test("enter on login with < 3 chars shows banner and stays", () => {
   state = reduce(state, { type: "key", key: "enter" });
   expect(state.screen).toBe("login");
   expect(state.banner).toBe("Name must be at least 3 letters.");
+});
+
+test("enter on short name keeps the resolved input when a pending letter expires", () => {
+  let state = loginState();
+  state.input = {
+    text: "A",
+    pendingKey: "2",
+    pendingIndex: 0, // "A"
+    pendingAtMs: Date.now() - MULTITAP_WINDOW_MS - 1,
+  };
+  state = reduce(state, { type: "key", key: "enter" });
+  expect(state.screen).toBe("login");
+  expect(state.banner).toBe("Name must be at least 3 letters.");
+  expect(state.input.text).toBe("AA"); // committed, not the stale "A"
+  expect(state.input.pendingKey).toBeNull();
 });
 
 test("enter on login with valid name moves to home", () => {
