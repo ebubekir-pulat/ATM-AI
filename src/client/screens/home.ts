@@ -4,7 +4,7 @@ import { formatCents } from "../ui/money.js";
 
 export function homeView(state: AppState): ViewModel {
   return {
-    title: `WELCOME, ${state.userName || ""}`,
+    title: `WELCOME, ${state.userName}`,
     lines: ["Balance", formatCents(state.balanceCents)],
   };
 }
