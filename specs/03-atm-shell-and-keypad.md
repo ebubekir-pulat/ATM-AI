@@ -210,7 +210,6 @@ markup, so `main.ts` may assume the elements exist.
 - [ ] CLEAR empties the entry; BACK removes one character; ENTER with `AB` shows
       `Name must be at least 3 letters.` and stays on login.
 - [ ] ENTER with `ABC` goes to home and the title reads `WELCOME, ABC`.
-- [ ] BACK on the amount screen deletes a digit, and on an empty entry returns home.
 - [ ] On a 375 px viewport the ATM fits without horizontal scrolling and every key is
       thumb-reachable.
 - [ ] Typing in a text field does not operate the ATM. ATM should never be operated by a keyboard
