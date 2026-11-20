@@ -3,11 +3,13 @@ import type Database from "better-sqlite3";
 import request from "supertest";
 import { createApp } from "../../src/server/app";
 import { openDatabase } from "../../src/server/db";
+import { clearSessions } from "../../src/server/sessions";
 
 let db: Database.Database;
 let app: ReturnType<typeof createApp>;
 
 beforeEach(() => {
+  clearSessions();
   db = openDatabase(":memory:");
   app = createApp({ db });
 });
@@ -25,8 +27,17 @@ describe("GET /api/health", () => {
 });
 
 describe("GET /api/account", () => {
-  it("returns the shared account", async () => {
+  it("401 NOT_AUTHENTICATED without a session cookie", async () => {
     const res = await request(app).get("/api/account");
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe("NOT_AUTHENTICATED");
+  });
+
+  it("returns the shared account when logged in", async () => {
+    const login = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
+    const cookie = login.headers["set-cookie"][0].split(";")[0];
+
+    const res = await request(app).get("/api/account").set("Cookie", cookie);
     expect(res.status).toBe(200);
     expect(res.body.account.balanceCents).toBe(100000);
     expect(res.body.account.balanceFormatted).toBe("$1,000.00");
@@ -34,8 +45,11 @@ describe("GET /api/account", () => {
   });
 
   it("returns 500 INTERNAL and no stack when the balance row is gone", async () => {
+    const login = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
+    const cookie = login.headers["set-cookie"][0].split(";")[0];
+
     db.exec("DELETE FROM account");
-    const res = await request(app).get("/api/account");
+    const res = await request(app).get("/api/account").set("Cookie", cookie);
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: { code: "INTERNAL", message: "Something went wrong." } });
   });

@@ -1,11 +1,21 @@
 import http from "node:http";
 import { openDatabase } from "./db";
 import { createApp } from "./app";
+import { sweepSessions } from "./sessions";
 import { DB_PATH, HOST, LAN_URLS, PORT } from "./config";
 
 const db = openDatabase(DB_PATH);
-const app = createApp({ db });
+
+// Slice 05 replaces this with the real WebSocket broadcast.
+function broadcastActivity(): void {}
+
+const app = createApp({ db, broadcastActivity });
 const server = http.createServer(app);
+
+// Sweep sessions every 5 seconds
+setInterval(() => {
+  sweepSessions();
+}, 5000);
 
 server.on("error", (error: NodeJS.ErrnoException) => {
   if (error.code === "EADDRINUSE") {
