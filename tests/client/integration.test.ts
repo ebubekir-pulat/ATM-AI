@@ -39,8 +39,12 @@ test("full login flow: multi-tap ABC -> enter -> home", () => {
   expect(shownText(input)).toBe("ABC_");
   state.input = input;
 
-  // Confirm with ENTER: the reducer drives login to home.
+  // Confirm with ENTER: the reducer alone must NOT log in…
   state = reduce(state, { type: "key", key: "enter" });
+  expect(state.screen).toBe("login");
+
+  // …only the server's answer (main.ts dispatches this) goes home.
+  state = reduce(state, { type: "login", userName: "ABC" });
 
   expect(state.screen).toBe("home");
   expect(state.userName).toBe("ABC");
@@ -94,10 +98,15 @@ test("ENTER with AB shows error banner", () => {
   expect(loginView(state).banner).toBe("Name must be at least 3 letters.");
 });
 
-test("ENTER with ABC goes to home", () => {
+test("ENTER with ABC waits for the server and only the login action goes home", () => {
   let state = createInitialState();
   state.input = { text: "ABC", pendingKey: null, pendingIndex: 0, pendingAtMs: null };
   state = reduce(state, { type: "key", key: "enter" });
+  expect(state.screen).toBe("login");
+  expect(state.userName).toBeNull();
+  expect(state.banner).toBeNull();
+
+  state = reduce(state, { type: "login", userName: "ABC" });
   expect(state.screen).toBe("home");
   expect(state.userName).toBe("ABC");
   expect(homeView(state).title).toBe("WELCOME, ABC");

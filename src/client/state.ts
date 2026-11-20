@@ -56,7 +56,13 @@ export type Key =
 export type Action =
   | { type: "key"; key: Key }
   | { type: "screen"; to: ScreenName }
-  | { type: "login"; userName: string };
+  | { type: "login"; userName: string }
+  | { type: "logout" }
+  | { type: "busy"; isBusy: boolean }
+  | { type: "banner"; message: string | null }
+  | { type: "balance"; balanceCents: number }
+  | { type: "connection"; status: Connection }
+  | { type: "amountMode"; mode: "withdraw" | "deposit" };
 
 export const MULTITAP_WINDOW_MS = 800;
 export const MAX_NAME_LENGTH = 20;
@@ -88,7 +94,34 @@ export function reduce(state: AppState, action: Action): AppState {
       return { ...state, screen: action.to };
 
     case "login":
-      return { ...state, userName: action.userName, screen: "home", banner: null };
+      // Server confirmed: go home with a clean entry (spec §4 "reset input").
+      return { ...state, userName: action.userName, screen: "home", input: createMultiTap(), banner: null };
+
+    case "logout":
+      return {
+        ...state,
+        screen: "login",
+        userName: null,
+        balanceCents: 0,
+        input: createMultiTap(),
+        banner: "You are signed out.",
+        busy: false,
+      };
+
+    case "busy":
+      return { ...state, busy: action.isBusy };
+
+    case "banner":
+      return { ...state, banner: action.message };
+
+    case "balance":
+      return { ...state, balanceCents: action.balanceCents };
+
+    case "connection":
+      return { ...state, connection: action.status };
+
+    case "amountMode":
+      return { ...state, screen: "amount", amountMode: action.mode, amountDigits: "" };
 
     case "key": {
       const now = Date.now();
@@ -108,13 +141,9 @@ export function reduce(state: AppState, action: Action): AppState {
             if (name.length < 3) {
               return { ...state, input, banner: "Name must be at least 3 letters." };
             }
-            return {
-              ...state,
-              screen: "home",
-              userName: name,
-              input: clearAll(),
-              banner: null,
-            };
+            // Valid name: main.ts intercepts ENTER and calls the server.
+            // Returning state unchanged keeps the typed name if the request fails.
+            return { ...state, input };
           }
         }
       }

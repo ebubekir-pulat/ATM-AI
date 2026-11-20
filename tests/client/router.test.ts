@@ -73,13 +73,13 @@ test("enter on short name keeps the resolved input when a pending letter expires
   expect(state.input.pendingKey).toBeNull();
 });
 
-test("enter on login with valid name moves to home", () => {
+test("enter on login with valid name waits for the server (stays on login)", () => {
   let state = loginState();
   state.input = { text: "ABC", pendingKey: null, pendingIndex: 0, pendingAtMs: null };
   state = reduce(state, { type: "key", key: "enter" });
-  expect(state.screen).toBe("home");
-  expect(state.userName).toBe("ABC");
-  expect(state.banner).toBeNull();
+  expect(state.screen).toBe("login");
+  expect(state.userName).toBeNull();
+  expect(state.input.text).toBe("ABC"); // kept, so a refused name can be edited
 });
 
 test("clear on login empties entry", () => {
@@ -110,4 +110,83 @@ test("login action sets userName and moves to home", () => {
   expect(state.screen).toBe("home");
   expect(state.userName).toBe("ALICE");
   expect(state.banner).toBeNull();
+});
+
+function homeState(overrides: Partial<AppState> = {}): AppState {
+  return { ...createInitialState(), screen: "home", userName: "ALICE", balanceCents: 100000, ...overrides };
+}
+
+test("logout action returns to login, clears userName and input", () => {
+  let state = homeState({ userName: "ALICE", balanceCents: 100000 });
+  state = reduce(state, { type: "logout" });
+  expect(state.screen).toBe("login");
+  expect(state.userName).toBeNull();
+  expect(state.input.text).toBe("");
+  expect(state.banner).toBe("You are signed out.");
+});
+
+test("busy action sets busy flag", () => {
+  let state = loginState();
+  state = reduce(state, { type: "busy", isBusy: true });
+  expect(state.busy).toBe(true);
+  state = reduce(state, { type: "busy", isBusy: false });
+  expect(state.busy).toBe(false);
+});
+
+test("banner action sets banner message", () => {
+  let state = loginState();
+  state = reduce(state, { type: "banner", message: "Hello" });
+  expect(state.banner).toBe("Hello");
+  state = reduce(state, { type: "banner", message: null });
+  expect(state.banner).toBeNull();
+});
+
+test("balance action updates balanceCents", () => {
+  let state = homeState({ balanceCents: 100000 });
+  state = reduce(state, { type: "balance", balanceCents: 50000 });
+  expect(state.balanceCents).toBe(50000);
+});
+
+test("connection action updates connection status", () => {
+  let state = loginState();
+  state = reduce(state, { type: "connection", status: "connected" });
+  expect(state.connection).toBe("connected");
+});
+
+test("amountMode action transitions to amount screen with mode", () => {
+  let state = homeState({ userName: "ALICE", balanceCents: 100000 });
+  state = reduce(state, { type: "amountMode", mode: "withdraw" });
+  expect(state.screen).toBe("amount");
+  expect(state.amountMode).toBe("withdraw");
+  expect(state.amountDigits).toBe("");
+
+  state = reduce(state, { type: "amountMode", mode: "deposit" });
+  expect(state.amountMode).toBe("deposit");
+});
+
+// Spec §6 flow tests
+test("login success sets userName, clears typed name and banner", () => {
+  let state = loginState({
+    input: { text: "ALICE", pendingKey: null, pendingIndex: 0, pendingAtMs: null },
+    banner: "Signing in…",
+  });
+  state = reduce(state, { type: "login", userName: "ALICE" });
+  expect(state.screen).toBe("home");
+  expect(state.userName).toBe("ALICE");
+  expect(state.input.text).toBe("");
+  expect(state.banner).toBeNull();
+});
+
+test("nameTaken: server refusal keeps login screen and typed name", () => {
+  let state = loginState({
+    input: { text: "ALEX", pendingKey: null, pendingIndex: 0, pendingAtMs: null },
+    busy: true,
+  });
+  // main.ts shows the server's message and never dispatches "login"
+  state = reduce(state, { type: "busy", isBusy: false });
+  state = reduce(state, { type: "banner", message: "That name is already in use. Try another name." });
+  expect(state.screen).toBe("login");
+  expect(state.userName).toBeNull();
+  expect(state.input.text).toBe("ALEX");
+  expect(state.banner).toBe("That name is already in use. Try another name.");
 });
