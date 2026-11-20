@@ -153,4 +153,20 @@ describe("sweepSessions", () => {
     expect(sweptAgain).toHaveLength(0);
     vi.useRealTimers();
   });
+
+  it("sweeps a session whose tab closed after its last request cleared the clock", () => {
+    const s = createSession("USER1");
+    const id = s.id;
+
+    // A request proves presence and clears the absence clock (keepalive).
+    expect(getSession(id)).not.toBeNull();
+    expect(s.absentSinceMs).toBeNull();
+
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(SESSION_GRACE_MS + 1);
+
+    expect(sweepSessions()).toHaveLength(1);
+    expect(getSession(id)).toBeNull();
+    vi.useRealTimers();
+  });
 });

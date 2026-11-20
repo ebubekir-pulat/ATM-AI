@@ -27,23 +27,30 @@ export function createSession(userName: string): Session {
   return session;
 }
 
+// A session without a socket is absent from its last seen activity until the
+// grace period passes. A cleared absence clock means "present" since that last
+// activity, so a tab that closed after its last request can still be swept.
+function isLive(session: Session, now: number): boolean {
+  const absentSince = session.absentSinceMs ?? session.lastSeenMs;
+  if (session.sockets !== 0) {
+    return true;
+  }
+  return now - absentSince <= SESSION_GRACE_MS;
+}
+
 export function getSession(id: string): Session | null {
   const session = sessions.get(id);
   if (!session) return null;
 
   const now = Date.now();
-  // Liveness check: dead if sockets === 0 AND absentSinceMs past grace
-  if (session.sockets === 0 && session.absentSinceMs !== null) {
-    if (now - session.absentSinceMs > SESSION_GRACE_MS) {
-      sessions.delete(id);
-      return null;
-    }
+  if (isLive(session, now)) {
+    session.lastSeenMs = now;
+    session.absentSinceMs = null;
+    return session;
   }
 
-  // Request proves presence: refresh lastSeenMs, clear absentSinceMs
-  session.lastSeenMs = now;
-  session.absentSinceMs = null;
-  return session;
+  sessions.delete(id);
+  return null;
 }
 
 export function destroySession(id: string): void {
@@ -81,15 +88,9 @@ export function setSessionSockets(id: string, n: number): void {
 }
 
 export function findSessionByName(name: string): Session | null {
+  const now = Date.now();
   for (const session of sessions.values()) {
-    if (session.userName === name) {
-      // Apply liveness check inline
-      const now = Date.now();
-      if (session.sockets === 0 && session.absentSinceMs !== null) {
-        if (now - session.absentSinceMs > SESSION_GRACE_MS) {
-          continue; // dead, skip
-        }
-      }
+    if (session.userName === name && isLive(session, now)) {
       return session;
     }
   }
@@ -101,12 +102,11 @@ export function sweepSessions(): Session[] {
   const swept: Session[] = [];
 
   for (const [id, session] of sessions.entries()) {
-    if (session.sockets === 0 && session.absentSinceMs !== null) {
-      if (now - session.absentSinceMs > SESSION_GRACE_MS) {
-        sessions.delete(id);
-        swept.push(session);
-      }
+    if (isLive(session, now)) {
+      continue;
     }
+    sessions.delete(id);
+    swept.push(session);
   }
   return swept;
 }

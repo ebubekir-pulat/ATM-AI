@@ -80,20 +80,16 @@ async function boot() {
   dispatch({ type: "busy", isBusy: true });
   try {
     const session = await currentSession();
-    if (session) {
-      dispatch({ type: "login", userName: session.userName });
-      await loadAccount();
-    } else {
-      dispatch({ type: "screen", to: "login" });
-      dispatch({ type: "banner", message: null });
-    }
+    dispatch({ type: "login", userName: session.userName });
+    await loadAccount();
   } catch (e) {
-    if (e instanceof HttpError && e.code === "NETWORK") {
+    if (e instanceof HttpError && e.status === 401) {
+      handle401();
+    } else if (e instanceof HttpError && e.code === "NETWORK") {
       dispatch({ type: "banner", message: "Cannot reach the ATM server." });
     } else {
       handle401();
     }
-    dispatch({ type: "screen", to: "login" });
   } finally {
     dispatch({ type: "busy", isBusy: false });
   }
@@ -192,11 +188,12 @@ boot();
 setInterval(() => {
   if (state.screen !== "home" || state.busy) return;
   void currentSession()
-    .then((session) => {
-      if (!session) handle401();
+    .then(() => {
+      // Session alive — nothing to do.
     })
-    .catch(() => {
-      // network blip — keepalive never disturbs the screen
+    .catch((e) => {
+      // Network blips never disturb the screen; a 401 means the session died.
+      if (e instanceof HttpError && e.status === 401) handle401();
     });
 }, KEEPALIVE_MS);
 
