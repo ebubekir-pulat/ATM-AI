@@ -51,7 +51,7 @@ Deterministic rules, all unit tested:
    `"last hour"` → the last 60 minutes. Explicit dates and times are not parsed; the
    model sees the window and can say it lacks detail.
 2. **User filter.** Any uppercased token of 3–20 letters matching a `user_name` in the
-   log filters to that user (`"who did user3"` → `USER3`).
+   log filters to that user (`"who did user3"` → `CHLOE`).
 3. **Kind filter.** `deposit` keeps deposit events, `withdraw` keeps withdrawal events.
    `*_failed` rows keep their kind, so "why did my withdrawal fail" has evidence.
 4. **Amount filter.** `$5,000`, `5,000`, `5000`, `5000.00` and "500 dollars" all parse
@@ -130,9 +130,9 @@ Deposits in period: $500.00 across 2 entries
 Withdrawals in period: $5,000.00 across 1 entry
 Total entries given: 3 (oldest first)
 
-[41] 2026-11-15 12:30:55 USER3 withdraw $5,000.00, balance after $500.00
-[42] 2026-11-15 12:40:00 USER1 login
-[43] 2026-11-15 12:41:12 USER1 logout
+[41] 2026-11-15 12:30:55 CHLOE withdraw $5,000.00, balance after $500.00
+[42] 2026-11-15 12:40:00 SIMON login
+[43] 2026-11-15 12:41:12 SIMON logout
 
 Question: Why is there $5,000 less than when I last logged in?
 ```
@@ -187,11 +187,11 @@ client is used.
 ## 8. Tests
 
 `tests/server/retrieval.test.ts` — fixture log with logins, a `$5,000` withdrawal by
-`USER3`, two deposits by `USER1` today and one old entry:
+`CHLOE`, two deposits by `SIMON` today and one old entry:
 - `"Today"` excludes the old entry; sums count only today's rows.
 - `"Show me the last five transactions"` returns the newest 5, oldest first.
 - `"Who withdrew $5,000?"` returns only the matching rows.
-- `"What did USER3 do today?"` filters by user.
+- `"What did CHLOE do today?"` filters by user.
 - `"How much has been deposited today?"` keeps both deposits and the summary sums them.
 - An empty result falls back to the last 10 while the summary stays zero.
 - `entries.length <= AI_CONTEXT_LIMIT` always.

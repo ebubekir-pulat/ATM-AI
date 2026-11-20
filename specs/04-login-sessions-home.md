@@ -47,7 +47,7 @@ Home:
   - `setSessionSockets(id, n > 0)` clears it
   - `index.ts` calls `sweepSessions` every 5s
 - **`setSessionSockets` on unknown/destroyed ID** is a no-op (socket disconnect after sign-out must not throw).
-- **Name held = session live.** `findSessionByName` applies liveness rule. Returns holder of `USER1` or `null` if session gone. Exact match (`USER1` ≠ `USER10`).
+- **Name held = session live.** `findSessionByName` applies liveness rule. Returns holder of `SIMON` or `null` if session gone. Exact match (`SIMON` ≠ `ALEX`).
 - **Sweeping/expiry writes NO `logout` entry** — person didn't sign out. Slice 07 releases any lock held by swept session.
 - **Sessions don't survive restart**; balance, log, and names do.
 
@@ -71,9 +71,9 @@ Signing out (or sweep) frees name for **reuse**, not ownership. Row stays → ne
 
 ### `POST /api/session`
 
-**Request:** `{ "name": "USER1" }`
+**Request:** `{ "name": "SIMON" }`
 
-**Success (201 new / 200 known):** `{ "session": { "userName": "USER1" } }` + `Set-Cookie: atm_sid=<uuid>; HttpOnly; Path=/; SameSite=Lax; Max-Age=1800`
+**Success (201 new / 200 known):** `{ "session": { "userName": "SIMON" } }` + `Set-Cookie: atm_sid=<uuid>; HttpOnly; Path=/; SameSite=Lax; Max-Age=1800`
 
 **Validation order:**
 
@@ -96,11 +96,11 @@ Signing out (or sweep) frees name for **reuse**, not ownership. Row stays → ne
 
 ### `GET /api/session/availability`
 
-`?name=USER1` → `200 { "available": true }` where `false` = another live session holds it **right now**. Known name whose owner signed out = available (reuse allowed). No session required, creates nothing, same validation (`400 INVALID_NAME` if invalid), writes no log row. **Not authoritative** — exists for login page to warn while typing, before user loses multi-tap entry to refusal.
+`?name=SIMON` → `200 { "available": true }` where `false` = another live session holds it **right now**. Known name whose owner signed out = available (reuse allowed). No session required, creates nothing, same validation (`400 INVALID_NAME` if invalid), writes no log row. **Not authoritative** — exists for login page to warn while typing, before user loses multi-tap entry to refusal.
 
 ### `GET /api/session`
 
-`200 { "session": { "userName": "USER1" } }` or `401 NOT_AUTHENTICATED`
+`200 { "session": { "userName": "SIMON" } }` or `401 NOT_AUTHENTICATED`
 
 ### `DELETE /api/session`
 
@@ -146,7 +146,7 @@ export async function getAccount(): Promise<Account>
 ### Home Screen
 
 ```
-WELCOME, USER1
+WELCOME, SIMON
 Balance
 $1,000.00
         [ Withdraw ]  [ Deposit ]  [ Sign out ]
@@ -166,8 +166,8 @@ Resets to login with `Session ended. Please log in again.` **Only place** client
 ## 5. Log Output
 
 ```
-USER1: Logged in at 12:30:45
-USER1: Logged out at 12:41:00
+SIMON: Logged in at 12:30:45
+SIMON: Logged out at 12:41:00
 ```
 
 Both written by route handlers, **never by client** → client cannot claim event that didn't happen.
@@ -194,10 +194,10 @@ Both written by route handlers, **never by client** → client cannot claim even
 - `GET /api/session` with cookie → 200; without cookie → 401
 - `GET /api/account` without cookie → 401 (protected by `requireSession`)
 - `DELETE` → 204, cookie cleared, one `logout` row; second `DELETE` → 204, still one row
-- **In use:** A logged in as `USER1`; B posts `USER1` → 409, no `Set-Cookie`, no second row, B's `GET /api/session` still 401. `USER10` stays available.
-- **Released:** A signs out, B posts `USER1` → 200. With small `SESSION_GRACE_MS`, A's `setSessionSockets(A, 0)` + sweep also releases it.
-- **Idempotent:** A posts `USER1` again with own cookie → 200, no second `login` row.
-- **Race:** 20 agents post `USER1` with `Promise.all` → one 201, nineteen 409, one `login` row, one `user_names` row.
+- **In use:** A logged in as `SIMON`; B posts `SIMON` → 409, no `Set-Cookie`, no second row, B's `GET /api/session` still 401. `ALEX` stays available.
+- **Released:** A signs out, B posts `SIMON` → 200. With small `SESSION_GRACE_MS`, A's `setSessionSockets(A, 0)` + sweep also releases it.
+- **Idempotent:** A posts `SIMON` again with own cookie → 200, no second `login` row.
+- **Race:** 20 agents post `SIMON` with `Promise.all` → one 201, nineteen 409, one `login` row, one `user_names` row.
 - **Availability:** `true` before login, `false` while A holds it, `true` after A signs out; no cookie needed; `?name=ab` → 400; writes no log row.
 
 ### `tests/client/router.test.ts` (extended)

@@ -40,7 +40,7 @@ Signatures in `01` §9. Behaviour:
 - `acquire` — if `getLock()` is `null`, take it with
   `expiresAtMs = now + LOCK_LEASE_MS` (route answers `201`). If the caller already owns
   it, extend the lease and return it (`200`, so a double tap is idempotent). Otherwise
-  `ApiError(423, "ACCOUNT_LOCKED", "Another transaction is in progress (USER2). Try
+  `ApiError(423, "ACCOUNT_LOCKED", "Another transaction is in progress (BLAKE). Try
   again in a moment.")`.
 - **The check and the set have no `await` between them.** That is the
   mutual-exclusion mechanism: one synchronous function in a single-threaded process, so
@@ -113,7 +113,7 @@ Every row is a test (§7).
   1000)`. With a 30 s lease, 1 s granularity means a refusal is never more than a second
   stale.
 - Neither path writes a log entry: an expired lock is not a transaction, and claiming
-  "USER1 cancelled" when the browser crashed would be inventing an event.
+  "SIMON cancelled" when the browser crashed would be inventing an event.
 
 ## 6. Client
 
@@ -127,7 +127,7 @@ Every row is a test (§7).
 5. `NETWORK`/`401` → the standard paths from slices 04/05.
 
 Buttons stay enabled while `state.lock.locked` is true, so a user always gets the
-explanation. A banner above the buttons reads `USER2 is transacting…` while someone else
+explanation. A banner above the buttons reads `BLAKE is transacting…` while someone else
 holds the lock and `You have the account for this transaction.` while it is ours. On
 socket connect/reconnect the slice 05 handler also calls `getLock()`, so a reconnecting
 browser knows the state before the user presses anything.

@@ -92,8 +92,8 @@ afterEach(() => {
 
 describe("Session IDs", () => {
   it("are distinct UUIDs", () => {
-    const a = createSession("USER1");
-    const b = createSession("USER2");
+    const a = createSession("SIMON");
+    const b = createSession("BLAKE");
     expect(a.id).not.toBe(b.id);
     expect(a.id).toMatch(/^[0-9a-f-]{36}$/);
   });
@@ -101,17 +101,17 @@ describe("Session IDs", () => {
 
 describe("getSession round-trips", () => {
   it("returns session and updates lastSeenMs", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     const before = s.lastSeenMs;
     // Small delay to ensure timestamp changes
     const got = getSession(s.id);
     expect(got).not.toBeNull();
     expect(got!.lastSeenMs).toBeGreaterThanOrEqual(before);
-    expect(got!.userName).toBe("USER1");
+    expect(got!.userName).toBe("SIMON");
   });
 
   it("returns null for destroyed session", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     destroySession(s.id);
     expect(getSession(s.id)).toBeNull();
   });
@@ -135,7 +135,7 @@ describe("readSessionId", () => {
 
 describe("setSessionSockets liveness", () => {
   it("starts absence clock at 0, clears at >0", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     const id = s.id;
     
     setSessionSockets(id, 0);
@@ -149,7 +149,7 @@ describe("setSessionSockets liveness", () => {
   });
 
   it("session past grace is dead", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     const id = s.id;
     setSessionSockets(id, 0);
     
@@ -162,7 +162,7 @@ describe("setSessionSockets liveness", () => {
   });
 
   it("session within grace is alive", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     const id = s.id;
     setSessionSockets(id, 0);
     
@@ -179,7 +179,7 @@ describe("setSessionSockets on unknown/destroyed ID is no-op", () => {
     expect(() => setSessionSockets("non-existent-id", 0)).not.toThrow();
     expect(() => setSessionSockets("non-existent-id", 5)).not.toThrow();
     
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     destroySession(s.id);
     expect(() => setSessionSockets(s.id, 0)).not.toThrow();
   });
@@ -187,32 +187,32 @@ describe("setSessionSockets on unknown/destroyed ID is no-op", () => {
 
 describe("findSessionByName applies liveness", () => {
   it("returns holder if session live", () => {
-    const s = createSession("USER1");
-    expect(findSessionByName("USER1")?.id).toBe(s.id);
+    const s = createSession("SIMON");
+    expect(findSessionByName("SIMON")?.id).toBe(s.id);
   });
 
   it("returns null if session gone (past grace)", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     const id = s.id;
     setSessionSockets(id, 0);
     
     vi.useFakeTimers();
     vi.advanceTimersByTime(SESSION_GRACE_MS + 1);
     
-    expect(findSessionByName("USER1")).toBeNull();
+    expect(findSessionByName("SIMON")).toBeNull();
     vi.useRealTimers();
   });
 
-  it("exact match only (USER1 ≠ USER10)", () => {
-    createSession("USER1");
-    expect(findSessionByName("USER10")).toBeNull();
+  it("exact match only (SIMON ≠ ALEX)", () => {
+    createSession("SIMON");
+    expect(findSessionByName("ALEX")).toBeNull();
   });
 });
 
 describe("sweepSessions", () => {
   it("destroys only sessions past grace, returns them", () => {
-    const a = createSession("USER1");
-    const b = createSession("USER2");
+    const a = createSession("SIMON");
+    const b = createSession("BLAKE");
     setSessionSockets(a.id, 0);
     setSessionSockets(b.id, 1); // b has a live socket, so not absent
     
@@ -401,9 +401,9 @@ afterEach(() => {
 
 describe("ensureName", () => {
   it("returns true first time, false second, leaves one row", () => {
-    expect(ensureName(db, "USER1")).toBe(true);
-    expect(ensureName(db, "USER1")).toBe(false);
-    expect(ensureName(db, "USER2")).toBe(true);
+    expect(ensureName(db, "SIMON")).toBe(true);
+    expect(ensureName(db, "SIMON")).toBe(false);
+    expect(ensureName(db, "BLAKE")).toBe(true);
 
     const count = db.prepare("SELECT COUNT(*) AS n FROM user_names").get() as { n: number };
     expect(count.n).toBe(2);
@@ -570,38 +570,38 @@ describe("POST /api/session", () => {
   it("new name → 201, Set-Cookie, login row, user_names row", async () => {
     const res = await request(app)
       .post("/api/session")
-      .send({ name: "USER1" })
+      .send({ name: "SIMON" })
       .expect(201);
     
-    expect(res.body).toEqual({ session: { userName: "USER1" } });
+    expect(res.body).toEqual({ session: { userName: "SIMON" } });
     expect(cookieHeader(res)).toMatch(/^atm_sid=/);
     
     const loginRows = db.prepare("SELECT * FROM activity_log WHERE event_type = 'login'").all();
     expect(loginRows).toHaveLength(1);
-    expect(loginRows[0].user_name).toBe("USER1");
+    expect(loginRows[0].user_name).toBe("SIMON");
     
-    const nameRows = db.prepare("SELECT * FROM user_names WHERE name = 'USER1'").all();
+    const nameRows = db.prepare("SELECT * FROM user_names WHERE name = 'SIMON'").all();
     expect(nameRows).toHaveLength(1);
   });
 
   it("known name after sign-out → 200, new Set-Cookie, new login row, same user_names row", async () => {
     // First login
-    const res1 = await request(app).post("/api/session").send({ name: "USER1" }).expect(201);
+    const res1 = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
     const cookie1 = cookieHeader(res1)!;
     
     // Sign out
     await request(app).delete("/api/session").set("Cookie", cookie1).expect(204);
     
     // Login again
-    const res2 = await request(app).post("/api/session").send({ name: "USER1" }).expect(200);
-    expect(res2.body).toEqual({ session: { userName: "USER1" } });
+    const res2 = await request(app).post("/api/session").send({ name: "SIMON" }).expect(200);
+    expect(res2.body).toEqual({ session: { userName: "SIMON" } });
     expect(cookieHeader(res2)).toMatch(/^atm_sid=/);
     expect(cookieHeader(res2)).not.toBe(cookie1); // new session ID
     
     const loginRows = db.prepare("SELECT * FROM activity_log WHERE event_type = 'login'").all();
     expect(loginRows).toHaveLength(2); // two login entries
     
-    const nameRows = db.prepare("SELECT * FROM user_names WHERE name = 'USER1'").all();
+    const nameRows = db.prepare("SELECT * FROM user_names WHERE name = 'SIMON'").all();
     expect(nameRows).toHaveLength(1); // still one name row
   });
 
@@ -644,11 +644,11 @@ describe("POST /api/session", () => {
 
 describe("GET /api/session", () => {
   it("with valid cookie → 200", async () => {
-    const res1 = await request(app).post("/api/session").send({ name: "USER1" }).expect(201);
+    const res1 = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
     const cookie = cookieHeader(res1)!;
     
     const res2 = await request(app).get("/api/session").set("Cookie", cookie).expect(200);
-    expect(res2.body).toEqual({ session: { userName: "USER1" } });
+    expect(res2.body).toEqual({ session: { userName: "SIMON" } });
   });
 
   it("without cookie → 401 NOT_AUTHENTICATED", async () => {
@@ -666,7 +666,7 @@ describe("GET /api/account is protected", () => {
 
 describe("DELETE /api/session", () => {
   it("signs out → 204, cookie cleared, logout row", async () => {
-    const res1 = await request(app).post("/api/session").send({ name: "USER1" }).expect(201);
+    const res1 = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
     const cookie = cookieHeader(res1)!;
     
     const res2 = await request(app).delete("/api/session").set("Cookie", cookie).expect(204);
@@ -677,11 +677,11 @@ describe("DELETE /api/session", () => {
     
     const logoutRows = db.prepare("SELECT * FROM activity_log WHERE event_type = 'logout'").all();
     expect(logoutRows).toHaveLength(1);
-    expect(logoutRows[0].user_name).toBe("USER1");
+    expect(logoutRows[0].user_name).toBe("SIMON");
   });
 
   it("second DELETE → 204, still one logout row", async () => {
-    const res1 = await request(app).post("/api/session").send({ name: "USER1" }).expect(201);
+    const res1 = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
     const cookie = cookieHeader(res1)!;
     
     await request(app).delete("/api/session").set("Cookie", cookie).expect(204);
@@ -693,37 +693,37 @@ describe("DELETE /api/session", () => {
 });
 
 describe("In use: another live session holds the name", () => {
-  it("A logged in as USER1; B posts USER1 → 409, no Set-Cookie, no second row, B still 401", async () => {
+  it("A logged in as SIMON; B posts SIMON → 409, no Set-Cookie, no second row, B still 401", async () => {
     // A logs in
-    const resA = await request(app).post("/api/session").send({ name: "USER1" }).expect(201);
+    const resA = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
     const cookieA = cookieHeader(resA)!;
     
     // B tries same name (no cookie)
-    const resB = await request(app).post("/api/session").send({ name: "USER1" }).expect(409);
+    const resB = await request(app).post("/api/session").send({ name: "SIMON" }).expect(409);
     expect(resB.body.error.code).toBe("NAME_TAKEN");
     expect(resB.headers["set-cookie"]).toBeUndefined();
     
     // B's GET /api/session still 401
     await request(app).get("/api/session").expect(401);
     
-    // USER10 still available
-    await request(app).post("/api/session").send({ name: "USER10" }).expect(201);
+    // ALEX still available
+    await request(app).post("/api/session").send({ name: "ALEX" }).expect(201);
   });
 });
 
 describe("Released: sign-out or sweep frees name for reuse", () => {
-  it("A signs out, B posts USER1 → 200", async () => {
-    const resA = await request(app).post("/api/session").send({ name: "USER1" }).expect(201);
+  it("A signs out, B posts SIMON → 200", async () => {
+    const resA = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
     const cookieA = cookieHeader(resA)!;
     
     await request(app).delete("/api/session").set("Cookie", cookieA).expect(204);
     
-    const resB = await request(app).post("/api/session").send({ name: "USER1" }).expect(200);
-    expect(resB.body).toEqual({ session: { userName: "USER1" } });
+    const resB = await request(app).post("/api/session").send({ name: "SIMON" }).expect(200);
+    expect(resB.body).toEqual({ session: { userName: "SIMON" } });
   });
 
   it("A's sockets drop to 0 + grace expires + sweep → name reusable", async () => {
-    const resA = await request(app).post("/api/session").send({ name: "USER1" }).expect(201);
+    const resA = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
     const cookieA = cookieHeader(resA)!;
     const sessionId = cookieA!.split("=")[1];
 
@@ -737,27 +737,27 @@ describe("Released: sign-out or sweep frees name for reuse", () => {
     // Sweeping writes no logout row — the person never signed out.
     expect(db.prepare("SELECT COUNT(*) AS n FROM activity_log WHERE event_type = 'logout'").get()).toEqual({ n: 0 });
 
-    const resB = await request(app).post("/api/session").send({ name: "USER1" }).expect(201);
-    expect(resB.body).toEqual({ session: { userName: "USER1" } });
+    const resB = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
+    expect(resB.body).toEqual({ session: { userName: "SIMON" } });
   });
 });
 
 describe("Idempotent: same cookie posts same name again", () => {
-  it("A posts USER1 again with own cookie → 200, no second login row", async () => {
-    const res1 = await request(app).post("/api/session").send({ name: "USER1" }).expect(201);
+  it("A posts SIMON again with own cookie → 200, no second login row", async () => {
+    const res1 = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
     const cookie = cookieHeader(res1)!;
     
-    const res2 = await request(app).post("/api/session").send({ name: "USER1" }).set("Cookie", cookie).expect(200);
-    expect(res2.body).toEqual({ session: { userName: "USER1" } });
+    const res2 = await request(app).post("/api/session").send({ name: "SIMON" }).set("Cookie", cookie).expect(200);
+    expect(res2.body).toEqual({ session: { userName: "SIMON" } });
     
     const loginRows = db.prepare("SELECT * FROM activity_log WHERE event_type = 'login'").all();
     expect(loginRows).toHaveLength(1);
   });
 });
 
-describe("Race: 20 agents post USER1 simultaneously", () => {
+describe("Race: 20 agents post SIMON simultaneously", () => {
   it("one 201, nineteen 409, one login row, one user_names row", async () => {
-    const agents = Array.from({ length: 20 }, () => request(app).post("/api/session").send({ name: "USER1" }));
+    const agents = Array.from({ length: 20 }, () => request(app).post("/api/session").send({ name: "SIMON" }));
     const results = await Promise.all(agents.map(p => p));
     
     const statuses = results.map(r => r.status).sort();
@@ -767,7 +767,7 @@ describe("Race: 20 agents post USER1 simultaneously", () => {
     const loginRows = db.prepare("SELECT * FROM activity_log WHERE event_type = 'login'").all();
     expect(loginRows).toHaveLength(1);
     
-    const nameRows = db.prepare("SELECT * FROM user_names WHERE name = 'USER1'").all();
+    const nameRows = db.prepare("SELECT * FROM user_names WHERE name = 'SIMON'").all();
     expect(nameRows).toHaveLength(1);
   });
 });
@@ -775,29 +775,29 @@ describe("Race: 20 agents post USER1 simultaneously", () => {
 describe("Availability: GET /api/session/availability", () => {
   it("true before login, false while held, true after sign-out; no cookie needed", async () => {
     // Before login
-    let res = await request(app).get("/api/session/availability?name=USER1").expect(200);
+    let res = await request(app).get("/api/session/availability?name=SIMON").expect(200);
     expect(res.body).toEqual({ available: true });
     
     // A logs in
-    const resLogin = await request(app).post("/api/session").send({ name: "USER1" }).expect(201);
+    const resLogin = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
     const cookieA = cookieHeader(resLogin)!;
     
     // While held
-    res = await request(app).get("/api/session/availability?name=USER1").expect(200);
+    res = await request(app).get("/api/session/availability?name=SIMON").expect(200);
     expect(res.body).toEqual({ available: false });
     
     // Sign out
     await request(app).delete("/api/session").set("Cookie", cookieA).expect(204);
     
     // After release
-    res = await request(app).get("/api/session/availability?name=USER1").expect(200);
+    res = await request(app).get("/api/session/availability?name=SIMON").expect(200);
     expect(res.body).toEqual({ available: true });
   });
 
   it("writes no log rows", async () => {
     // Only call availability, no login
-    await request(app).get("/api/session/availability?name=USER1").expect(200);
-    await request(app).get("/api/session/availability?name=USER2").expect(200);
+    await request(app).get("/api/session/availability?name=SIMON").expect(200);
+    await request(app).get("/api/session/availability?name=BLAKE").expect(200);
     
     const logRows = db.prepare("SELECT * FROM activity_log").all();
     expect(logRows).toHaveLength(0);
@@ -1025,7 +1025,7 @@ describe("GET /api/account", () => {
   });
 
   it("returns the shared account when logged in", async () => {
-    const login = await request(app).post("/api/session").send({ name: "USER1" }).expect(201);
+    const login = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
     const cookie = login.headers["set-cookie"][0].split(";")[0];
 
     const res = await request(app).get("/api/account").set("Cookie", cookie);
@@ -1036,7 +1036,7 @@ describe("GET /api/account", () => {
   });
 
   it("returns 500 INTERNAL and no stack when the balance row is gone", async () => {
-    const login = await request(app).post("/api/session").send({ name: "USER1" }).expect(201);
+    const login = await request(app).post("/api/session").send({ name: "SIMON" }).expect(201);
     const cookie = login.headers["set-cookie"][0].split(";")[0];
 
     db.exec("DELETE FROM account");
@@ -1953,7 +1953,7 @@ test("renders real buttons that fire their onClick", () => {
   const root = document.getElementById("root")!;
   let clicks = 0;
   renderDisplay(root, {
-    title: "WELCOME, USER1",
+    title: "WELCOME, SIMON",
     lines: ["Balance", "$1,000.00"],
     actions: [
       { label: "Sign out", onClick: () => clicks++ },

@@ -220,9 +220,9 @@ All except `GET /api/health`, `POST /api/session` and
 | Method | Path | Request | Success |
 |--------|------|---------|---------|
 | GET | `/api/health` | — | `200 { "ok": true }` |
-| POST | `/api/session` | `{ "name": "USER1" }` | `201` when the name is new to the database, `200` when it already exists; both `{ "session": { "userName": "USER1" } }` + `Set-Cookie`; `409 NAME_TAKEN` while another live session holds it |
-| GET | `/api/session/availability` | `?name=USER1` | `200 { "available": boolean }` |
-| GET | `/api/session` | — | `200 { "session": { "userName": "USER1" } }` |
+| POST | `/api/session` | `{ "name": "SIMON" }` | `201` when the name is new to the database, `200` when it already exists; both `{ "session": { "userName": "SIMON" } }` + `Set-Cookie`; `409 NAME_TAKEN` while another live session holds it |
+| GET | `/api/session/availability` | `?name=SIMON` | `200 { "available": boolean }` |
+| GET | `/api/session` | — | `200 { "session": { "userName": "SIMON" } }` |
 | DELETE | `/api/session` | — | `204`, cookie cleared, `logout` entry |
 | GET | `/api/account` | — | `200 { "account": Account }` |
 | GET | `/api/lock` | — | `200 { "lock": LockState }` |

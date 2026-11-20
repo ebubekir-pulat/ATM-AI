@@ -118,9 +118,9 @@ balance.
    `eventType: "login"` and that `userName`.
 3. `UPDATE account SET balance_cents = ?` then `broadcastAccount(getAccount(db))` → the
    socket gets the new value.
-4. Two sockets, `USER1` logged in, `broadcastLockState()` with a lock held by `USER1` →
+4. Two sockets, `SIMON` logged in, `broadcastLockState()` with a lock held by `SIMON` →
    the logged-in socket gets `isMine: true`, the anonymous one `isMine: false` and
-   `ownerName: "USER1"`.
+   `ownerName: "SIMON"`.
 5. Malformed cookie (`atm_sid=not-a-session`) → connection succeeds with `isMine: false`.
 6. Server close → client gets `disconnect` (pass `reconnection: false`).
 7. A logged-in socket keeps its session live (`GET /api/session` → 200); after the last

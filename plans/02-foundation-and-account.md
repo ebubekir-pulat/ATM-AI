@@ -607,18 +607,18 @@ describe("recordEvent", () => {
     const before = Date.now();
     const entry = recordEvent(db, {
       eventType: "withdraw",
-      userName: "USER1",
+      userName: "SIMON",
       amountCents: 500000,
       balanceAfterCents: 50000,
     });
 
     expect(entry.timestampMs).toBeGreaterThanOrEqual(before);
-    expect(entry.message).toBe(`USER1: Withdrew $5,000.00 at ${entry.localTime}`);
+    expect(entry.message).toBe(`SIMON: Withdrew $5,000.00 at ${entry.localTime}`);
     expect(db.prepare("SELECT COUNT(*) AS n FROM activity_log").get()).toEqual({ n: 1 });
   });
 
   it("stores null amount and balance for a login", () => {
-    const entry = recordEvent(db, { eventType: "login", userName: "USER1" });
+    const entry = recordEvent(db, { eventType: "login", userName: "SIMON" });
     expect(entry.amountCents).toBeNull();
     expect(entry.balanceAfterCents).toBeNull();
   });
