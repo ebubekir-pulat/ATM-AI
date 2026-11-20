@@ -1,9 +1,17 @@
+export interface ActionViewModel {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  className?: string;
+}
+
 export interface ViewModel {
   title: string;
   lines: string[];
   input?: string;
   banner?: string | null;
   status?: "info" | "success" | "error";
+  actions?: ActionViewModel[];
 }
 
 export function renderDisplay(root: HTMLElement, vm: ViewModel): void {
@@ -37,6 +45,22 @@ export function renderDisplay(root: HTMLElement, vm: ViewModel): void {
     banner.className = `atm__banner atm__banner--${vm.status || "info"}`;
     banner.textContent = vm.banner;
     screen.appendChild(banner);
+  }
+
+  if (vm.actions && vm.actions.length > 0) {
+    const actions = document.createElement("div");
+    actions.className = "atm__actions";
+
+    for (const action of vm.actions) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `atm__action ${action.className ?? ""}`.trim();
+      btn.textContent = action.label;
+      btn.disabled = action.disabled ?? false;
+      btn.addEventListener("click", action.onClick);
+      actions.appendChild(btn);
+    }
+    screen.appendChild(actions);
   }
 
   root.appendChild(screen);

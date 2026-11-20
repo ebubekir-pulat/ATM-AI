@@ -37,3 +37,27 @@ test("renders error banner with status", () => {
   expect(banner.textContent).toBe("Name must be at least 3 letters.");
   expect(banner.classList.contains("atm__banner--error")).toBe(true);
 });
+
+test("renders real buttons that fire their onClick", () => {
+  const root = document.getElementById("root")!;
+  let clicks = 0;
+  renderDisplay(root, {
+    title: "WELCOME, USER1",
+    lines: ["Balance", "$1,000.00"],
+    actions: [
+      { label: "Sign out", onClick: () => clicks++ },
+      { label: "Withdraw", onClick: () => {}, disabled: true },
+    ],
+  });
+
+  const buttons = root.querySelectorAll<HTMLButtonElement>("button.atm__action");
+  expect(buttons).toHaveLength(2);
+  expect(root.querySelector(".atm__actions")).not.toBeNull();
+
+  buttons[0].click();
+  expect(clicks).toBe(1);
+
+  expect(buttons[1].disabled).toBe(true);
+  buttons[1].click();
+  expect(clicks).toBe(1); // disabled buttons do nothing
+});

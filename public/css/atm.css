@@ -106,3 +106,37 @@ html, body {
   padding-top: 8px;
   border-top: 1px solid #2d3548;
 }
+
+.atm__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.atm__action {
+  flex: 1;
+  min-width: 80px;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 100ms;
+  background: #2c3e50;
+  color: #fff;
+}
+
+.atm__action:hover:not(:disabled) { filter: brightness(1.1); }
+.atm__action:active:not(:disabled) { filter: brightness(0.92); }
+
+.atm__action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.atm__action:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}

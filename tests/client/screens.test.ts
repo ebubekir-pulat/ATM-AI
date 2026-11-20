@@ -53,6 +53,19 @@ test("messageView shows title and body", () => {
   expect(vm.input).toBeUndefined();
 });
 
+function homeState(overrides: Partial<AppState> = {}): AppState {
+  return { ...createInitialState(), screen: "home", userName: "ALICE", balanceCents: 100000, ...overrides };
+}
+
+test("home shows Withdraw, Deposit, Sign out — disabled while busy", () => {
+  const idle = homeView(homeState({ busy: false }));
+  expect(idle.actions?.map((a) => a.label)).toEqual(["Withdraw", "Deposit", "Sign out"]);
+  expect(idle.actions?.every((a) => !a.disabled)).toBe(true);
+
+  const busy = homeView(homeState({ busy: true }));
+  expect(busy.actions?.every((a) => a.disabled)).toBe(true);
+});
+
 test("transient banners render as info, real ones as error", () => {
   const checking = { ...createInitialState(), screen: "login" as const, banner: "Checking session…" };
   expect(loginView(checking).status).toBe("info");
