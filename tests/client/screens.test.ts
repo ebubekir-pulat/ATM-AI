@@ -52,3 +52,14 @@ test("messageView shows title and body", () => {
   expect(vm.lines).toEqual(["Something went wrong"]);
   expect(vm.input).toBeUndefined();
 });
+
+test("transient banners render as info, real ones as error", () => {
+  const checking = { ...createInitialState(), screen: "login" as const, banner: "Checking session…" };
+  expect(loginView(checking).status).toBe("info");
+
+  const signingIn = { ...createInitialState(), screen: "login" as const, banner: "Signing in…" };
+  expect(loginView(signingIn).status).toBe("info");
+
+  const nameTaken = { ...createInitialState(), screen: "login" as const, banner: "That name is already in use. Try another name." };
+  expect(loginView(nameTaken).status).toBe("error");
+});
