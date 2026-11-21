@@ -18,9 +18,9 @@ afterEach(() => {
 
 describe("ensureName", () => {
   it("returns true first time, false second, leaves one row", () => {
-    expect(ensureName(db, "USER1")).toBe(true);
-    expect(ensureName(db, "USER1")).toBe(false);
-    expect(ensureName(db, "USER2")).toBe(true);
+    expect(ensureName(db, "SIMON")).toBe(true);
+    expect(ensureName(db, "SIMON")).toBe(false);
+    expect(ensureName(db, "ALEX")).toBe(true);
 
     const count = db.prepare("SELECT COUNT(*) AS n FROM user_names").get() as { n: number };
     expect(count.n).toBe(2);
