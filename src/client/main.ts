@@ -80,12 +80,15 @@ async function boot() {
   dispatch({ type: "busy", isBusy: true });
   try {
     const session = await currentSession();
-    dispatch({ type: "login", userName: session.userName });
-    await loadAccount();
+    if (session) {
+      dispatch({ type: "login", userName: session.userName });
+      await loadAccount();
+    } else {
+      // No session yet — normal first load, show login screen cleanly
+      dispatch({ type: "banner", message: null });
+    }
   } catch (e) {
-    if (e instanceof HttpError && e.status === 401) {
-      handle401();
-    } else if (e instanceof HttpError && e.code === "NETWORK") {
+    if (e instanceof HttpError && e.code === "NETWORK") {
       dispatch({ type: "banner", message: "Cannot reach the ATM server." });
     } else {
       handle401();

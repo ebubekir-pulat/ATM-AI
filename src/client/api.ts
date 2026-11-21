@@ -62,9 +62,16 @@ export async function nameAvailable(name: string): Promise<boolean> {
   return res.available;
 }
 
-export async function currentSession(): Promise<Session> {
-  const body = await request<{ session: Session }>("/api/session");
-  return body.session;
+export async function currentSession(): Promise<Session | null> {
+  try {
+    const body = await request<{ session: Session }>("/api/session");
+    return body.session;
+  } catch (e) {
+    if (e instanceof HttpError && e.status === 401) {
+      return null;
+    }
+    throw e;
+  }
 }
 
 export async function logout(): Promise<void> {

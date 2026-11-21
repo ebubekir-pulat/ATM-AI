@@ -29,12 +29,12 @@ describe("api", () => {
     expect(init?.body).toBe(JSON.stringify({ name: "SIMON" }));
   });
 
-  it("currentSession unwraps { session } and surfaces 401 to the caller", async () => {
+  it("currentSession unwraps { session } and returns null on 401", async () => {
     fetchMock().mockResolvedValue(jsonResponse(200, { session: { userName: "SIMON" } }));
     expect(await currentSession()).toEqual({ userName: "SIMON" });
 
     fetchMock().mockResolvedValue(jsonResponse(401, { error: { code: "NOT_AUTHENTICATED", message: "nope" } }));
-    await expect(currentSession()).rejects.toMatchObject({ status: 401 });
+    expect(await currentSession()).toBeNull();
   });
 
   it("getAccount unwraps { account }", async () => {
