@@ -29,9 +29,13 @@ describe("getSession round-trips", () => {
     const s = createSession("SIMON");
     const before = s.lastSeenMs;
     // Small delay to ensure timestamp changes
+    const stop = Date.now() + 10;
+    while (Date.now() < stop) {
+      // spin until the clock advances
+    }
     const got = getSession(s.id);
     expect(got).not.toBeNull();
-    expect(got!.lastSeenMs).toBeGreaterThanOrEqual(before);
+    expect(got!.lastSeenMs).toBeGreaterThan(before);
     expect(got!.userName).toBe("SIMON");
   });
 
