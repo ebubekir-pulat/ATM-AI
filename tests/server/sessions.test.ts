@@ -17,8 +17,8 @@ afterEach(() => {
 
 describe("Session IDs", () => {
   it("are distinct UUIDs", () => {
-    const a = createSession("USER1");
-    const b = createSession("USER2");
+    const a = createSession("SIMON");
+    const b = createSession("ALEX");
     expect(a.id).not.toBe(b.id);
     expect(a.id).toMatch(/^[0-9a-f-]{36}$/);
   });
@@ -26,17 +26,17 @@ describe("Session IDs", () => {
 
 describe("getSession round-trips", () => {
   it("returns session and updates lastSeenMs", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     const before = s.lastSeenMs;
     // Small delay to ensure timestamp changes
     const got = getSession(s.id);
     expect(got).not.toBeNull();
     expect(got!.lastSeenMs).toBeGreaterThanOrEqual(before);
-    expect(got!.userName).toBe("USER1");
+    expect(got!.userName).toBe("SIMON");
   });
 
   it("returns null for destroyed session", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     destroySession(s.id);
     expect(getSession(s.id)).toBeNull();
   });
@@ -60,7 +60,7 @@ describe("readSessionId", () => {
 
 describe("setSessionSockets liveness", () => {
   it("starts absence clock at 0, clears at >0", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     const id = s.id;
 
     setSessionSockets(id, 0);
@@ -74,7 +74,7 @@ describe("setSessionSockets liveness", () => {
   });
 
   it("session past grace is dead", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     const id = s.id;
     setSessionSockets(id, 0);
 
@@ -87,7 +87,7 @@ describe("setSessionSockets liveness", () => {
   });
 
   it("session within grace is alive", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     const id = s.id;
     setSessionSockets(id, 0);
 
@@ -104,7 +104,7 @@ describe("setSessionSockets on unknown/destroyed ID is no-op", () => {
     expect(() => setSessionSockets("non-existent-id", 0)).not.toThrow();
     expect(() => setSessionSockets("non-existent-id", 5)).not.toThrow();
 
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     destroySession(s.id);
     expect(() => setSessionSockets(s.id, 0)).not.toThrow();
   });
@@ -112,32 +112,32 @@ describe("setSessionSockets on unknown/destroyed ID is no-op", () => {
 
 describe("findSessionByName applies liveness", () => {
   it("returns holder if session live", () => {
-    const s = createSession("USER1");
-    expect(findSessionByName("USER1")?.id).toBe(s.id);
+    const s = createSession("SIMON");
+    expect(findSessionByName("SIMON")?.id).toBe(s.id);
   });
 
   it("returns null if session gone (past grace)", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     const id = s.id;
     setSessionSockets(id, 0);
 
     vi.useFakeTimers();
     vi.advanceTimersByTime(SESSION_GRACE_MS + 1);
 
-    expect(findSessionByName("USER1")).toBeNull();
+    expect(findSessionByName("SIMON")).toBeNull();
     vi.useRealTimers();
   });
 
-  it("exact match only (USER1 ≠ USER10)", () => {
-    createSession("USER1");
-    expect(findSessionByName("USER10")).toBeNull();
+  it("exact match only (SIMON ≠ BLAKE)", () => {
+    createSession("SIMON");
+    expect(findSessionByName("BLAKE")).toBeNull();
   });
 });
 
 describe("sweepSessions", () => {
   it("destroys only sessions past grace, returns them", () => {
-    const a = createSession("USER1");
-    const b = createSession("USER2");
+    const a = createSession("SIMON");
+    const b = createSession("ALEX");
     setSessionSockets(a.id, 0);
     setSessionSockets(b.id, 1); // b has a live socket, so not absent
 
@@ -155,7 +155,7 @@ describe("sweepSessions", () => {
   });
 
   it("sweeps a session whose tab closed after its last request cleared the clock", () => {
-    const s = createSession("USER1");
+    const s = createSession("SIMON");
     const id = s.id;
 
     // A request proves presence and clears the absence clock (keepalive).
