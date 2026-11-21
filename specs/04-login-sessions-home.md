@@ -210,8 +210,8 @@ Both written by route handlers, **never by client** → client cannot claim even
 ## 7. Acceptance Criteria
 
 - [ ] Two browsers log in with different names; both homepages show `$1,000.00`
-- [ ] Third browser tries name while user logged in: after 3rd letter display warns, ENTER refused with same message, name stays editable
-- [ ] Sign that user out; third browser (or same) can log in with that name. Close tab instead: name frees itself ~1 minute later
+- [ ] Second browser tries name while user logged in: after 3rd letter display warns, ENTER refused with same message, name stays editable
+- [ ] Sign that user out; second browser (or same) can log in with that name. Close tab instead: name frees itself ~1 minute later
 - [ ] Sign out and back in as same name; check log: every row says that name, `select name from user_names` lists it exactly once
 - [ ] Reloading keeps user on homepage — no second login screen
 - [ ] Signing out in one browser does not sign out the other
