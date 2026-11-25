@@ -76,3 +76,11 @@ test("transient banners render as info, real ones as error", () => {
   const nameTaken = { ...createInitialState(), screen: "login" as const, banner: "That name is already in use. Try another name." };
   expect(loginView(nameTaken).status).toBe("error");
 });
+
+test("homeView carries the connection status", () => {
+  const state = createInitialState();
+  state.screen = "home";
+  state.userName = "ALICE";
+  state.connection = "offline";
+  expect(homeView(state).connection).toBe("offline");
+});

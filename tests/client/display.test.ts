@@ -61,3 +61,28 @@ test("renders real buttons that fire their onClick", () => {
   buttons[1].click();
   expect(clicks).toBe(1); // disabled buttons do nothing
 });
+
+test("renders the connection strip with a live dot", () => {
+  const root = document.getElementById("root")!;
+  renderDisplay(root, {
+    title: "WELCOME, ALICE",
+    lines: ["Balance", "$1,000.00"],
+    connection: "connected",
+  });
+
+  const status = root.querySelector(".atm__status") as HTMLElement;
+  expect(status).not.toBeNull();
+  expect(status.getAttribute("role")).toBe("status");
+  expect(status.getAttribute("aria-live")).toBe("polite");
+  expect(status.textContent).toBe("Live");
+  expect(status.querySelector(".atm__status-dot--connected")).not.toBeNull();
+});
+
+test("labels reconnecting and offline states", () => {
+  const root = document.getElementById("root")!;
+  renderDisplay(root, { title: "T", lines: [], connection: "connecting" });
+  expect(root.querySelector(".atm__status")?.textContent).toBe("Reconnecting…");
+
+  renderDisplay(root, { title: "T", lines: [], connection: "offline" });
+  expect(root.querySelector(".atm__status")?.textContent).toBe("Offline");
+});

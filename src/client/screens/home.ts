@@ -39,6 +39,7 @@ export function homeView(state: AppState): ViewModel {
   return {
     title: `WELCOME, ${state.userName || ""}`,
     lines: ["Balance", formatCents(state.balanceCents)],
+    connection: state.connection,
     actions,
   };
 }
