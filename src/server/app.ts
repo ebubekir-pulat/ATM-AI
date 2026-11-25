@@ -5,16 +5,13 @@ import { requireSession } from "./http/requireSession";
 import { getAccount } from "./account";
 import { errorHandler, notFoundHandler } from "./http/errors";
 
-export function createApp(deps: {
-  db: Database.Database;
-  broadcastActivity?: () => void;
-}): express.Express {
+export function createApp(deps: { db: Database.Database }): express.Express {
   const app = express();
 
   app.use(express.json());
 
   // Public routes (no session required)
-  app.use("/api", createSessionRouter(deps.db, deps.broadcastActivity ?? (() => {})));
+  app.use("/api", createSessionRouter(deps.db));
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
   // Protected routes (require session)

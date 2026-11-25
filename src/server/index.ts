@@ -2,15 +2,13 @@ import http from "node:http";
 import { openDatabase } from "./db";
 import { createApp } from "./app";
 import { sweepSessions } from "./sessions";
+import { attachRealtime } from "./realtime";
 import { DB_PATH, HOST, LAN_URLS, PORT } from "./config";
 
 const db = openDatabase(DB_PATH);
-
-// Slice 05 replaces this with the real WebSocket broadcast.
-function broadcastActivity(): void {}
-
-const app = createApp({ db, broadcastActivity });
+const app = createApp({ db });
 const server = http.createServer(app);
+const io = attachRealtime(server, { db });
 
 // Sweep sessions every 5 seconds
 setInterval(() => {
@@ -31,3 +29,19 @@ server.listen(PORT, HOST, () => {
     console.log(`  http://${address}:${PORT}`);
   }
 });
+
+// Ctrl-C stops the LAN demo all the time: close sockets, then the HTTP server
+// (io.close() does both), then the database.
+let shuttingDown = false;
+function shutdown(signal: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal} received, shutting down.`);
+  io.close(() => {
+    db.close();
+    process.exit(0);
+  });
+}
+
+process.once("SIGINT", () => shutdown("SIGINT"));
+process.once("SIGTERM", () => shutdown("SIGTERM"));

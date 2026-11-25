@@ -5,6 +5,7 @@ import { requireSession } from "../requireSession";
 import { createSession, getSession, destroySession, readSessionId, findSessionByName } from "../../sessions";
 import { ensureName } from "../../names";
 import { recordEvent } from "../../activity";
+import { broadcastActivity } from "../../realtime";
 import { SESSION_COOKIE } from "../../config";
 
 const NAME_REGEX = /^[A-Z]{3,20}$/;
@@ -36,7 +37,7 @@ function validateName(name: string): string {
   return trimmed;
 }
 
-export function createSessionRouter(db: Database.Database, broadcastActivity: () => void): Router {
+export function createSessionRouter(db: Database.Database): Router {
   const router = Router();
 
   // POST /api/session — login
@@ -69,15 +70,16 @@ export function createSessionRouter(db: Database.Database, broadcastActivity: ()
       throw new ApiError(409, "NAME_TAKEN", "That name is already in use. Try another name.");
     }
 
-    // All checks passed — all side effects in one transaction
-    let isNew = false;
-    db.transaction(() => {
-      isNew = ensureName(db, name);
-      recordEvent(db, { eventType: "login", userName: name });
+    // All checks passed — all database side effects in one transaction.
+    // The broadcast happens only after the transaction has committed.
+    const { isNew, entry } = db.transaction(() => {
+      const isNew = ensureName(db, name);
+      const entry = recordEvent(db, { eventType: "login", userName: name });
       const session = createSession(name);
       setSessionCookie(res, session.id);
-      broadcastActivity();
+      return { isNew, entry };
     })();
+    broadcastActivity(entry);
 
     const status = isNew ? 201 : 200;
     res.status(status).json({ session: { userName: name } });
@@ -107,12 +109,13 @@ export function createSessionRouter(db: Database.Database, broadcastActivity: ()
     if (sessionId) {
       const session = getSession(sessionId);
       if (session) {
-        // Sign-out is an event
-        db.transaction(() => {
-          recordEvent(db, { eventType: "logout", userName: session.userName });
+        // Sign-out is an event; broadcast after the transaction commits.
+        const entry = db.transaction(() => {
+          const entry = recordEvent(db, { eventType: "logout", userName: session.userName });
           destroySession(sessionId);
-          broadcastActivity();
+          return entry;
         })();
+        broadcastActivity(entry);
       }
       // If session already gone, still 204, no event
     }
