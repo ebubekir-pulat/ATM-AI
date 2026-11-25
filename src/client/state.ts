@@ -1,4 +1,5 @@
 import { backspace, clearAll, press, resolve, shownText } from "./ui/multitap.js";
+import type { ActivityEntry, LockState } from "../shared/types.js";
 
 export type ScreenName = "login" | "home" | "amount" | "message";
 export type Connection = "connected" | "connecting" | "offline";
@@ -10,18 +11,7 @@ export interface MultiTapState {
   pendingAtMs: number | null;
 }
 
-export interface ActivityEntry {
-  timestamp: number;
-  type: string;
-  amountCents?: number;
-  balanceAfterCents?: number;
-}
-
-export interface LockState {
-  lockedAt: number;
-  expiresAt: number;
-  attempts: number;
-}
+export const MAX_RECENT_ACTIVITY = 20;
 
 export interface AppState {
   screen: ScreenName;
@@ -61,6 +51,8 @@ export type Action =
   | { type: "busy"; isBusy: boolean }
   | { type: "banner"; message: string | null }
   | { type: "balance"; balanceCents: number }
+  | { type: "lock"; lock: LockState }
+  | { type: "activity"; entry: ActivityEntry }
   | { type: "connection"; status: Connection }
   | { type: "amountMode"; mode: "withdraw" | "deposit" };
 
@@ -116,6 +108,14 @@ export function reduce(state: AppState, action: Action): AppState {
 
     case "balance":
       return { ...state, balanceCents: action.balanceCents };
+
+    case "lock":
+      return { ...state, lock: action.lock };
+
+    case "activity": {
+      const recentActivity = [...state.recentActivity, action.entry];
+      return { ...state, recentActivity: recentActivity.slice(-MAX_RECENT_ACTIVITY) };
+    }
 
     case "connection":
       return { ...state, connection: action.status };

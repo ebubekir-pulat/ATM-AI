@@ -74,6 +74,8 @@ export async function currentSession(): Promise<Session | null> {
   }
 }
 
+// Slice 05: the socket re-opens after the cookie changes so `isMine` and
+// presence follow the new session.
 export async function logout(): Promise<void> {
   await request("/api/session", { method: "DELETE" });
 }
@@ -82,7 +84,3 @@ export async function getAccount(): Promise<Account> {
   const body = await request<{ account: Account }>("/api/account");
   return body.account;
 }
-
-// Slice 05 replaces this with a WebSocket re-handshake so the socket picks up
-// the new/cleared cookie. No-op in this slice.
-export async function refreshSession(): Promise<void> {}

@@ -8,8 +8,9 @@ import { messageView } from "./screens/message.js";
 import { resolve, shownText } from "./ui/multitap.js";
 import {
   currentSession, getAccount, login, logout, nameAvailable,
-  refreshSession, HttpError,
+  HttpError,
 } from "./api.js";
+import { connectRealtime, refreshSession } from "./realtime.js";
 import {
   MSG_CHECKING, MSG_SIGNING_IN, MSG_NAME_TAKEN, KEEPALIVE_MS,
 } from "./messages.js";
@@ -184,7 +185,14 @@ setHomeCallbacks({
 });
 
 render();
-boot();
+void boot().then(() => {
+  connectRealtime({
+    onAccount: (account) => dispatch({ type: "balance", balanceCents: account.balanceCents }),
+    onLock: (lock) => dispatch({ type: "lock", lock }),
+    onActivity: (entry) => dispatch({ type: "activity", entry }),
+    onStatus: (status) => dispatch({ type: "connection", status }),
+  });
+});
 
 // Keepalive: the server sweeps sessions silent for SESSION_GRACE_MS (60s).
 // Without this, a quiet open tab would be logged out after a minute.
