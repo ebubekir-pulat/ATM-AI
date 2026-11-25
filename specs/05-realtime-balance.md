@@ -131,12 +131,12 @@ Every test closes its sockets and server in `afterEach` so Vitest exits.
 
 ## 6. Acceptance criteria
 
-- [ ] Two browsers on the homepage; `UPDATE account SET balance_cents = 250000 WHERE id
-      = 1` (plus a later transaction or restart) updates the other browser without a
-      reload.
-- [ ] Killing the server turns both dots amber, then red; restarting turns them green
-      and re-syncs the balance.
-- [ ] A phone that sleeps and wakes re-syncs on its own within three seconds.
-- [ ] Login and sign-out produce `activity:created` on the other browser's socket.
-- [ ] No route handler broadcasts before its transaction commits.
+- [ ] Two browsers are open on the homepage; when the balance changes (for example
+      `UPDATE account SET balance_cents = 250000 WHERE id = 1`, or a later transaction or
+      restart), the other browser updates without a reload.
+- [ ] If the server is stopped, both browsers show the amber "Reconnecting…" dot, then the
+      red "Offline" dot; when it starts again they show green "Live" and get the balance.
+- [ ] A sleeping device re-syncs within about three seconds of waking up.
+- [ ] A login or sign-out sends an `activity:created` event to the other browser's socket.
+- [ ] No route handler broadcasts before the database write has committed.
 - [ ] `npm test` passes and exits without open handles.
