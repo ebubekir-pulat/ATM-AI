@@ -38,8 +38,10 @@ function shutdown(signal: string): void {
   shuttingDown = true;
   console.log(`${signal} received, shutting down.`);
   io.close(() => {
-    db.close();
-    process.exit(0);
+    server.close(() => {
+      db.close();
+      process.exit(0);
+    });
   });
 }
 
