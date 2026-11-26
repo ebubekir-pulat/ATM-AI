@@ -167,8 +167,8 @@ describe("realtime broadcasts", () => {
 
     socket.close();
     await new Promise<void>((resolve) => setImmediate(resolve));
-    // The server removes the socket from its namespace map before emitting
-    // `disconnect`, so an empty map means the disconnect handler has run.
+    // Socket.IO drops the socket from its namespace map before emitting
+    // `disconnect`, so the map cannot tell us when our handler has run; wait.
     await new Promise<void>((resolve) => setTimeout(resolve, 20));
 
     vi.useFakeTimers();
