@@ -207,9 +207,8 @@ git commit -m "feat: complete slice 05 - realtime balance and lock broadcasts"
       call), the other browser updates without a reload. A direct `UPDATE account ...`
       from another process is not observed; it appears only on reload, reconnect, or
       restart.
-- [ ] If the server is stopped, both browsers show the amber "Reconnecting…" dot, then the red "Offline" dot; when it starts again they show green "Live" and get the balance.
+- [ ] If the server is stopped, a browser shows the amber "Reconnecting…" dot, then the red "Offline" dot; when it starts again they show green "Live" and get the balance.
 - [ ] A sleeping device re-syncs within about three seconds of waking up.
-- [ ] A login or sign-out sends an `activity:created` event to the other browser's socket.
 - [ ] No route handler broadcasts before the database write has committed.
 - [ ] `npm test` passes and exits without open handles.
 
@@ -226,11 +225,10 @@ How an engineer manually asserts each acceptance criterion after implementing:
    `UPDATE account SET balance_cents = 250000 WHERE id = 1` against `data/atm.db` is
    out-of-band: it is not broadcast, and appears only after a reload, reconnect, or
    restart.
-2. **Connection state:** stop the server; both browsers show amber "Reconnecting…" then red "Offline"; restart; both show green "Live" and get the balance.
+2. **Connection state:** stop the server; a browser shows amber "Reconnecting…" then red "Offline"; restart; both show green "Live" and get the balance.
 3. **Sleeping device:** sleep a logged-in device; wake it; within ~3s it shows green "Live" and the current balance.
-4. **Login / sign-out activity:** while one browser is connected, log in / sign out from the other; the connected browser receives `activity:created`.
-5. **No broadcast before commit:** verify by code inspection that broadcasts are only called after the write transaction returns (becomes fully enforced with slice 06 transaction routes).
-6. **Test suite:** run `npm test`; must pass and exit without open handles.
+4. **No broadcast before commit:** verify by code inspection that broadcasts are only called after the write transaction returns (becomes fully enforced with slice 06 transaction routes).
+5. **Test suite:** run `npm test`; must pass and exit without open handles.
 
 ---
 

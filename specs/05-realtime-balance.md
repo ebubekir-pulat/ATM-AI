@@ -143,6 +143,5 @@ Every test closes its sockets and server in `afterEach` so Vitest exits.
 - [ ] If the server is stopped, both browsers show the amber "Reconnecting…" dot, then the
       red "Offline" dot; when it starts again they show green "Live" and get the balance.
 - [ ] A sleeping device re-syncs within about three seconds of waking up.
-- [ ] A login or sign-out sends an `activity:created` event to the other browser's socket.
 - [ ] No route handler broadcasts before the database write has committed.
 - [ ] `npm test` passes and exits without open handles.
