@@ -202,7 +202,11 @@ git commit -m "feat: complete slice 05 - realtime balance and lock broadcasts"
 
 ## Acceptance Criteria Checklist
 
-- [ ] Two browsers open on the homepage; when the balance changes (e.g. `UPDATE account SET balance_cents = 250000 WHERE id = 1`, or a later transaction or restart), the other browser updates without a reload.
+- [ ] Two browsers open on the homepage; when the balance changes through the server
+      (a deposit or withdrawal in slice 06/07, or the realtime test's `broadcastAccount`
+      call), the other browser updates without a reload. A direct `UPDATE account ...`
+      from another process is not observed; it appears only on reload, reconnect, or
+      restart.
 - [ ] If the server is stopped, both browsers show the amber "Reconnecting…" dot, then the red "Offline" dot; when it starts again they show green "Live" and get the balance.
 - [ ] A sleeping device re-syncs within about three seconds of waking up.
 - [ ] A login or sign-out sends an `activity:created` event to the other browser's socket.
@@ -215,7 +219,13 @@ git commit -m "feat: complete slice 05 - realtime balance and lock broadcasts"
 
 How an engineer manually asserts each acceptance criterion after implementing:
 
-1. **Balance change propagates:** run `npm start`; open two browsers; log in as two names; both see `$1,000.00`; run `UPDATE account SET balance_cents = 250000 WHERE id = 1` (sqlite3 against `data/atm.db`); the second browser updates without reload.
+1. **Balance change propagates:** until slice 06/07 adds deposit and withdrawal, this is
+   covered by `npx vitest run tests/server/realtime.test.ts` ("broadcasts a committed
+   balance change"), which writes the row and calls `broadcastAccount`. After slice
+   06/07, deposit in one browser and watch the other update without a reload. A direct
+   `UPDATE account SET balance_cents = 250000 WHERE id = 1` against `data/atm.db` is
+   out-of-band: it is not broadcast, and appears only after a reload, reconnect, or
+   restart.
 2. **Connection state:** stop the server; both browsers show amber "Reconnecting…" then red "Offline"; restart; both show green "Live" and get the balance.
 3. **Sleeping device:** sleep a logged-in device; wake it; within ~3s it shows green "Live" and the current balance.
 4. **Login / sign-out activity:** while one browser is connected, log in / sign out from the other; the connected browser receives `activity:created`.

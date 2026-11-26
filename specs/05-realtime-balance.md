@@ -10,7 +10,10 @@ every other browser without a reload, with a visible connection state.
 
 ## 1. Rules
 
-1. Every connected browser sees `account:updated` within a second.
+1. Every connected browser sees `account:updated` within a second of a write made
+   **through the server**. A write made out-of-band by another process (e.g. `sqlite3`
+   or a separate `node` script) is not observed; the client repairs itself on the next
+   reconnect or reload.
 2. No client computes a balance; it displays what it was sent.
 3. A reconnecting browser repairs its own state, even if it missed events.
 4. An event is only ever sent **after** the database write committed.
@@ -131,9 +134,12 @@ Every test closes its sockets and server in `afterEach` so Vitest exits.
 
 ## 6. Acceptance criteria
 
-- [ ] Two browsers are open on the homepage; when the balance changes (for example
-      `UPDATE account SET balance_cents = 250000 WHERE id = 1`, or a later transaction or
-      restart), the other browser updates without a reload.
+- [ ] Two browsers are open on the homepage; when the balance changes through the server
+      (a deposit or withdrawal from slice 06/07, or the realtime test's
+      `broadcastAccount` call), the other browser updates without a reload. A direct
+      `UPDATE account SET balance_cents = 250000 WHERE id = 1` from another process
+      bypasses the server: it is not broadcast and appears only on reload, reconnect, or
+      restart.
 - [ ] If the server is stopped, both browsers show the amber "Reconnecting…" dot, then the
       red "Offline" dot; when it starts again they show green "Live" and get the balance.
 - [ ] A sleeping device re-syncs within about three seconds of waking up.
